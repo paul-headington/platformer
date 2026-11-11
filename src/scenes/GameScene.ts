@@ -338,7 +338,27 @@ export class GameScene extends Phaser.Scene {
     const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setOrigin(0, 0).setDepth(-2.5);
     const tooClose = () => Math.abs(this.player.x - left - 8) < TILE * 2 && Math.abs(this.player.y - top - 16) < TILE * 3;
     const out = [1, 2, 3, 4, 3, 5, 4, 3, 5, 4, 3];
+    // Where the tip of the tentacle is in each frame, relative to the vent's top-left.
+    const TIP: [number, number][] = [[8, 0], [7, 16], [9, 22], [3, 29], [12, 30], [10, 29]];
     let i = 0;
+    const drip = () => {
+      const frame = Number(tentacle.frame.name);
+      if (frame >= 2 && Math.random() < 0.7) {
+        const [dx, dy] = TIP[frame];
+        const drop = this.add.rectangle(left + dx, top + dy, 2, 3, 0xa6e86a).setDepth(-2.4);
+        this.tweens.add({
+          targets: drop,
+          y: top + dy + Phaser.Math.Between(40, 90),
+          alpha: 0,
+          scaleY: 2,
+          duration: 700,
+          ease: 'Quad.in',
+          onComplete: () => drop.destroy(),
+        });
+      }
+      this.time.delayedCall(Phaser.Math.Between(250, 600), drip);
+    };
+    this.time.delayedCall(500, drip);
     const retract = (then: number) => {
       tentacle.setFrame(1);
       this.time.delayedCall(90, () => tentacle.setFrame(0));
