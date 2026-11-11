@@ -783,13 +783,14 @@ QQQQQQQQQQQQQQQQ
 QQQQQQQQQQQQQQQQ
 """
 
-# A flagstone that is really a lid: its joint is at the edges, and the moss is a touch thinner.
+# A flagstone that is really a lid: its joint is at the edges, the moss along the floor
+# is broken by a dark crack at each edge, and a small iron ring is set into it.
 TRAP_FLAG = """
-mmmmmmMmmmmmmmMm
+ammmmmMmmmmmmmMa
 abbbbbbbbbbbbbba
-abbbbbbbbbbbbbba
-abbdbbbbbbbbbbba
-abbbbbbbbbbbbdba
+abbbbbbkkkbbbbba
+abbdbbbkbkbbbbba
+abbbbbbkkkbbbdba
 abbbbbbbbbbbbbba
 dddddddddddddddd
 aaaaaaaaaaaaaaaa
@@ -1106,6 +1107,7 @@ SNAKE_PAL = {'G': (28, 70, 34), 'g': (62, 132, 56), 'h': (128, 176, 64), 'y': (1
              't': (230, 40, 70), 'f': (236, 236, 220), 'k': (40, 8, 14)}
 TRAP_WOOD_PAL = {**WOOD_PAL, 'k': (52, 34, 30)}
 TRAP_OPEN_PAL = {**WOOD_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
+TRAP_STONE_PAL = {**CELLAR_STONE_PAL, 'k': (40, 40, 44)}
 TRAP_OPEN_STONE_PAL = {**CELLAR_STONE_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
 DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
             'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
@@ -1129,7 +1131,7 @@ TILE_SHEETS = {
               (STAIRS, WOOD_PAL), (mirror(STAIRS), WOOD_PAL), (FLOORBOARDS, WOOD_PAL), (SHINGLES, ROOF_PAL),
               (FLAGSTONE, CELLAR_STONE_PAL), (CRATE, WOOD_PAL),
               (TRAP_BOARDS, TRAP_WOOD_PAL), (TRAP_OPEN, TRAP_OPEN_PAL),
-              (TRAP_FLAG, CELLAR_STONE_PAL), (TRAP_OPEN_FLAG, TRAP_OPEN_STONE_PAL)],
+              (TRAP_FLAG, TRAP_STONE_PAL), (TRAP_OPEN_FLAG, TRAP_OPEN_STONE_PAL)],
     # 0 attic planks, 1-3 upstairs wallpaper / rail / panelling, 4-6 downstairs, 7 cellar wall, 8 floor gap
     'back': [(ATTIC_PLANKS, ATTIC_PAL), (WALLPAPER, MAUVE_PAL), (WALLPAPER_RAIL, MAUVE_PAL), (WAINSCOT, MAUVE_PAL),
              (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
