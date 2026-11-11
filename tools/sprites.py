@@ -761,24 +761,102 @@ CANDLE_BASE = [
 ]
 CANDLE = ['\n'.join(flame + CANDLE_BASE) for flame in CANDLE_FLAMES]
 
-SPIKES = """
-................
-................
-................
-................
-................
-................
-................
-................
-.ll..ll..ll..ll.
-.lm..lm..lm..lm.
-.lm..lm..lm..lm.
-lmmMlmmMlmmMlmmM
-lmmMlmmMlmmMlmmM
-lmMMlmMMlmMMlmMM
-rrrrrrrrrrrrrrrr
-RRRRRRRRRRRRRRRR
+# Trapdoors. Closed, each is nearly the same as the floor it sits in: the only
+# tells are that the plank joints sit at the edges instead of the middle, and a
+# tiny sunken iron ring. Players have to really look.
+TRAP_BOARDS = """
+wwwwwwwwwwwwwwww
+xWWWWWWWWWWWWWWx
+xWWkWWWWWWWWWWWx
+xWWWWWWWWWWWWWWx
+xxxxxxxxxxxxxxxx
+qqqqqqqqqqqqqqqq
+qqqqqQqqqqqqqqqq
+qqqqqqqqqqqQqqqq
+qqqqqqqqqqqqqqqq
+qqQqqqqqqqqqqqqq
+qqqqqqqqqQqqqqqq
+qqqqqqqqqqqqqqqq
+qqqqqqQqqqqqqqqq
+qqqqqqqqqqqqqQqq
+QQQQQQQQQQQQQQQQ
+QQQQQQQQQQQQQQQQ
 """
+
+# A flagstone that is really a lid: its joint is at the edges, and the moss is a touch thinner.
+TRAP_FLAG = """
+mmmmmmMmmmmmmmMm
+abbbbbbbbbbbbbba
+abbbbbbbbbbbbbba
+abbdbbbbbbbbbbba
+abbbbbbbbbbbbdba
+abbbbbbbbbbbbbba
+dddddddddddddddd
+aaaaaaaaaaaaaaaa
+cccacccccccccacc
+bbdacbbbbbbbdacb
+bbdacbbbbbbbdacb
+bbdacbbdbbbbdacb
+bbdacbbbbbbbdacb
+bbdacbbbbbbbdacb
+dddadddddddddadd
+aaaaaaaaaaaaaaaa
+"""
+
+# Open: the lid has dropped away, and far below, in the dark, something coils. Drawn in the same palettes as the closed lids plus SNAKE_PAL.
+TRAP_OPEN = """
+xkkkkkkkkkkkkkkx
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+kkkkkGGkkkkkkkkk
+kkkkGgggGkkGGGkk
+kkGGgkkgGGGgkgGk
+kGggkkkkggggkkgk
+"""
+TRAP_OPEN_FLAG = TRAP_OPEN.replace('x', 'd')
+
+# A snake rearing up out of the pit, facing right. Frames shift it up out of the hole.
+SNAKE_BODY = """
+................
+......GGGGG.....
+.....GghhgggG...
+.....GggggrggG..
+.....GgyyyyyGG..
+......GGgyyy....
+........Ggy.....
+........Ggy.....
+.......Gggy.....
+......Gghy......
+......Ggy.......
+......Ggy.......
+......Gggy......
+.......Gghy.....
+........Ggy.....
+........Ggy.....
+.......Gggy.....
+......Gghy......
+......Ggy.......
+......Ggy.......
+"""
+SNAKE_TONGUE = SNAKE_BODY.replace('GgyyyyyGG..', 'GgyyyyyGGtt').replace('GGgyyy....', 'GGgyyy..t.', 1)
+SNAKE_STRIKE = SNAKE_BODY.replace('GggggrggG..', 'GggggrgggGG').replace('GgyyyyyGG..', 'Ggyyffkkkkf').replace(
+    '......GGgyyy....', '......GGgyyyyGGt', 1)
+
+
+def rise(art, dy):
+    """The snake `dy` pixels lower, its tail cut off by the bottom of the frame."""
+    rows = art.strip('\n').split('\n')
+    return '\n' + '\n'.join(['.' * len(rows[0])] * dy + rows[:len(rows) - dy]) + '\n'
+
 
 
 class Canvas:
@@ -1024,7 +1102,11 @@ DECOR_PAL = {**WINDOW_PAL, 'e': (196, 196, 216, 170), 'E': (170, 170, 196, 120),
 BOOK_PAL = {**DECOR_PAL, 'f': (98, 70, 54), 'y': (196, 150, 60)}
 CANDLE_PAL = {'o': (255, 160, 48), 'O': (255, 240, 170), 'w': (232, 224, 200), 'W': (190, 180, 160),
               'y': (214, 170, 80), 'Y': (150, 110, 40)}
-SPIKE_PAL = {'l': (206, 184, 168), 'm': (150, 96, 70), 'M': (96, 58, 46), 'r': (110, 70, 56), 'R': (70, 44, 38)}
+SNAKE_PAL = {'G': (28, 70, 34), 'g': (62, 132, 56), 'h': (128, 176, 64), 'y': (196, 186, 96), 'r': (255, 70, 50),
+             't': (230, 40, 70), 'f': (236, 236, 220), 'k': (40, 8, 14)}
+TRAP_WOOD_PAL = {**WOOD_PAL, 'k': (52, 34, 30)}
+TRAP_OPEN_PAL = {**WOOD_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
+TRAP_OPEN_STONE_PAL = {**CELLAR_STONE_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
 DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
             'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
 
@@ -1041,10 +1123,13 @@ WINDOW, BOOKCASE, COBWEB = window_art(), bookcase_art(), cobweb_art()
 # BootScene refer to frames by index (see the constants at the top of GameScene).
 TILE_SHEETS = {
     # 0 stone wall, 1 shelf, 2 ladder, 3 ladder top, 4 stairs up-right, 5 stairs up-left,
-    # 6 floorboards, 7 roof, 8 cellar floor, 9 crate
+    # 6 floorboards, 7 roof, 8 cellar floor, 9 crate,
+    # 10-11 trapdoor in floorboards (closed, open), 12-13 trapdoor in the cellar floor (closed, open)
     'tiles': [(STONE, STONE_PAL), (SHELF, WOOD_PAL), (LADDER, LADDER_PAL), (LADDER, LADDER_PAL),
               (STAIRS, WOOD_PAL), (mirror(STAIRS), WOOD_PAL), (FLOORBOARDS, WOOD_PAL), (SHINGLES, ROOF_PAL),
-              (FLAGSTONE, CELLAR_STONE_PAL), (CRATE, WOOD_PAL)],
+              (FLAGSTONE, CELLAR_STONE_PAL), (CRATE, WOOD_PAL),
+              (TRAP_BOARDS, TRAP_WOOD_PAL), (TRAP_OPEN, TRAP_OPEN_PAL),
+              (TRAP_FLAG, CELLAR_STONE_PAL), (TRAP_OPEN_FLAG, TRAP_OPEN_STONE_PAL)],
     # 0 attic planks, 1-3 upstairs wallpaper / rail / panelling, 4-6 downstairs, 7 cellar wall, 8 floor gap
     'back': [(ATTIC_PLANKS, ATTIC_PAL), (WALLPAPER, MAUVE_PAL), (WALLPAPER_RAIL, MAUVE_PAL), (WAINSCOT, MAUVE_PAL),
              (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
@@ -1055,7 +1140,9 @@ TILE_SHEETS = {
               (PORTRAIT_LADY, DECOR_PAL), (PORTRAIT_MOON, DECOR_PAL)] + [(b, BOOK_PAL) for b in BOOKCASE] +
              [(vent_art(), VENT_PAL)],
     'candle': [(f, CANDLE_PAL) for f in CANDLE],
-    'spikes': [(SPIKES, SPIKE_PAL)],
+    # A snake in the pit under a trapdoor: 0 just its head, 1 halfway, 2 reared up, tongue out, 3 striking
+    'snake': [(rise(SNAKE_BODY, 13), SNAKE_PAL), (rise(SNAKE_BODY, 6), SNAKE_PAL),
+              (SNAKE_TONGUE, SNAKE_PAL), (SNAKE_STRIKE, SNAKE_PAL)],
     'door': [(door_art(False), DOOR_PAL), (door_art(True), DOOR_PAL)],
     # Tentacles reaching out of a vent: 0 none, 1-2 sliding out, 3-5 swaying
     'tentacle': [(tentacle_art(l, sw, cu), TENTACLE_PAL) for l, sw, cu in

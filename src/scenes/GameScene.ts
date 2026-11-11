@@ -18,8 +18,14 @@ const FLOORBOARDS = 6;
 const ROOF = 7;
 const FLAGSTONE = 8;
 const CRATE = 9;
-/** Tiles nothing can pass through, from any side. */
-const SOLID = new Set([WALL, FLOORBOARDS, ROOF, FLAGSTONE, CRATE]);
+/** Trapdoors, closed and open, in floorboards and in the cellar flagstones. */
+const TRAP_BOARDS = 10;
+const TRAP_BOARDS_OPEN = 11;
+const TRAP_FLAG = 12;
+const TRAP_FLAG_OPEN = 13;
+/** Tiles nothing can pass through, from any side. An open trapdoor still holds up zombies. */
+const SOLID = new Set([WALL, FLOORBOARDS, ROOF, FLAGSTONE, CRATE, TRAP_BOARDS, TRAP_BOARDS_OPEN, TRAP_FLAG, TRAP_FLAG_OPEN]);
+const TRAP_OPENS: Record<number, number> = { [TRAP_BOARDS]: TRAP_BOARDS_OPEN, [TRAP_FLAG]: TRAP_FLAG_OPEN };
 
 /** Frames in the 'back' sheet: [plain wallpaper, wallpaper with dado rail, panelling] per zone. */
 const BACK: Record<BackStyle, [number, number, number]> = {
@@ -41,6 +47,13 @@ type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
 type State = 'playing' | 'dying' | 'won' | 'over';
 
+/** A trapdoor: a run of T tiles in one floor that opens as one. */
+interface Trap {
+  tiles: Phaser.Tilemaps.Tile[];
+  closed: number;
+  snakes: Phaser.GameObjects.Sprite[];
+}
+
 export interface HudMessage {
   text: string;
   sticky: boolean;
@@ -56,6 +69,9 @@ export class GameScene extends Phaser.Scene {
   private spawn = new Phaser.Math.Vector2();
   private levelHeight = 0;
   private nav!: NavGrid;
+  private traps: Trap[] = [];
+  /** The trapdoor the player last fell through; it shuts again when they respawn. */
+  private sprung: Trap | null = null;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyLeft: Phaser.Input.Keyboard.Key[] = [];
@@ -86,6 +102,8 @@ export class GameScene extends Phaser.Scene {
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
     this.invulnerableUntil = this.climbBlockedUntil = 0;
     this.climbing = this.onStairs = false;
+    this.traps = [];
+    this.sprung = null;
     pad.reset();
 
     this.registry.set(REG.score, 0);
@@ -110,7 +128,10 @@ export class GameScene extends Phaser.Scene {
     // M marks the cupboard monster's corner; underneath it is ordinary wall.
     const lurkers: [number, number][] = [];
     level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'M' && lurkers.push([tx, ty])));
-    const rows = level.rows.map((row) => row.replaceAll('M', '#'));
+    // T marks a trapdoor; until it opens it is floor, to the zombies and the floor art alike.
+    const trapCells = new Set<string>();
+    level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'T' && trapCells.add(`${tx},${ty}`)));
+    const rows = level.rows.map((row) => row.replaceAll('M', '#').replaceAll('T', '#'));
     const outside = GameScene.findSky(rows);
     const zoneOf = (ty: number) => level.zones.filter((z) => z.fromRow <= ty).at(-1)?.style ?? 'downstairs';
     const at = (tx: number, ty: number) => rows[ty]?.[tx] ?? '#';
@@ -122,10 +143,13 @@ export class GameScene extends Phaser.Scene {
         if (outside[ty - 1]?.[tx]) return ROOF;
         const above = at(tx, ty - 1);
         if (above === '#' || GameScene.isStairsChar(above)) return WALL;
-        return zoneOf(ty) === 'cellar' ? FLAGSTONE : FLOORBOARDS;
+        const trap = trapCells.has(`${tx},${ty}`);
+        if (zoneOf(ty) === 'cellar') return trap ? TRAP_FLAG : FLAGSTONE;
+        return trap ? TRAP_BOARDS : FLOORBOARDS;
       }),
     );
     this.layer = this.tileLayer(data, 'tiles', 0);
+    this.findTraps();
     // Stairs are marked as colliding only so the walls beside them don't get an open
     // edge; tileCollides() lets bodies pass through them and stairSurface() does the rest.
     this.layer.setCollision([...SOLID, SHELF, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
@@ -135,7 +159,6 @@ export class GameScene extends Phaser.Scene {
     const worldWidth = this.layer.width;
     this.levelHeight = this.layer.height;
 
-    const spikes = this.physics.add.staticGroup();
     const gems = this.physics.add.staticGroup();
     this.zombies = this.physics.add.group();
     this.ghosts = this.physics.add.group({ allowGravity: false });
@@ -149,12 +172,6 @@ export class GameScene extends Phaser.Scene {
         const cy = ty * TILE + TILE / 2;
         const bottom = (ty + 1) * TILE;
         switch (ch) {
-          case '^': {
-            const s = spikes.create(cx, cy, 'spikes') as Phaser.Physics.Arcade.Image;
-            s.setDepth(1);
-            (s.body as Phaser.Physics.Arcade.StaticBody).setSize(12, 6).setOffset(2, 10);
-            break;
-          }
           case '*': {
             const gem = gems.create(cx, cy, 'gem') as Sprite;
             gem.play({ key: 'gem-sparkle', startFrame: tx % 4 });
@@ -225,7 +242,6 @@ export class GameScene extends Phaser.Scene {
       (_b, t) => SOLID.has((t as Phaser.Tilemaps.Tile).index),
     );
 
-    this.physics.add.overlap(this.player, spikes, () => this.hurt());
     this.physics.add.overlap(this.player, this.zombies, () => this.hurt());
     this.physics.add.overlap(this.player, this.ghosts, () => this.hurt());
     this.physics.add.overlap(this.player, gems, (_p, g) => {
@@ -252,6 +268,26 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, [this.zombies, this.ghosts], (b, e) => {
       (b as Sprite).destroy();
       this.killEnemy(e as Sprite);
+    });
+  }
+
+  /** Groups the trapdoor tiles into trapdoors, and hides a snake in the pit under each tile. */
+  private findTraps(): void {
+    let current: Trap | null = null;
+    this.layer.forEachTile((tile) => {
+      const closed = tile.index;
+      if (!(closed in TRAP_OPENS)) {
+        current = null;
+        return;
+      }
+      const prev = current?.tiles.at(-1);
+      if (!current || !prev || prev.y !== tile.y || prev.x !== tile.x - 1) {
+        current = { tiles: [], closed, snakes: [] };
+        this.traps.push(current);
+      }
+      current.tiles.push(tile);
+      const snake = this.add.sprite(tile.getCenterX(), tile.pixelY + 3, 'snake', 0).setOrigin(0.5, 1).setDepth(11);
+      current.snakes.push(snake.setFlipX(tile.x % 2 === 1).setVisible(false));
     });
   }
 
@@ -533,6 +569,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
 
     this.updatePlayer(time);
+    this.checkTrapdoors();
 
     if (this.player.y > this.levelHeight + TILE) this.hurt(true);
   }
@@ -698,20 +735,81 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ---------------------------------------------------------------- trapdoors
+
+  /**
+   * A trapdoor gives way as soon as the player's middle is over it with their feet
+   * on it. Running fast doesn't save them; jumping over it does. Zombies never set
+   * one off, and it doesn't care about the blink after respawning either.
+   */
+  private checkTrapdoors(): void {
+    if (this.state !== 'playing' || this.climbing || this.onStairs) return;
+    const body = this.player.body as Body;
+    if (!body.blocked.down) return;
+    const tile = this.layer.getTileAtWorldXY(body.center.x, body.bottom + 1);
+    if (!tile || !(tile.index in TRAP_OPENS)) return;
+    const trap = this.traps.find((t) => t.tiles.includes(tile));
+    if (trap) this.fallThrough(trap);
+  }
+
+  /** The lid drops, the player sinks into the dark, and the snakes come up to see. */
+  private fallThrough(trap: Trap): void {
+    this.sprung = trap;
+    for (const tile of trap.tiles) tile.index = TRAP_OPENS[trap.closed];
+    const p = this.player;
+    const lives = this.loseLife();
+    const floor = trap.tiles[0].pixelY;
+    const body = p.body as Body;
+    body.moves = false; // the tween below moves the player now
+    p.setVelocity(0, 0);
+    p.anims.stop();
+    p.setFrame(PLAYER_FRAME.fall).setX(Phaser.Math.Clamp(p.x, trap.tiles[0].pixelX + 6, trap.tiles.at(-1)!.right - 6));
+    this.cameras.main.shake(120, 0.006);
+
+    // Hide whatever of the player has sunk below the floor.
+    const crop = () => {
+      const top = p.y - p.displayHeight * p.originY;
+      p.setCrop(0, 0, p.width, Phaser.Math.Clamp(floor - top, 0, p.height));
+    };
+    this.tweens.add({ targets: p, y: floor + 16, duration: 380, ease: 'Quad.in', onUpdate: crop, onComplete: crop });
+
+    trap.snakes.forEach((snake, i) => {
+      const frames = [0, 1, 2, 3, 2, 3, 2, 1, 0];
+      this.time.delayedCall(330 + i * 90, () => {
+        snake.setVisible(true);
+        frames.forEach((f, k) => this.time.delayedCall(k * 110, () => snake.setFrame(f)));
+        this.time.delayedCall(frames.length * 110, () => snake.setVisible(false));
+      });
+    });
+    this.time.delayedCall(560, () => this.cameras.main.shake(160, 0.01));
+    this.time.delayedCall(1500, () => (lives > 0 ? this.respawn() : this.gameOver()));
+  }
+
+  private closeTrap(): void {
+    if (!this.sprung) return;
+    for (const tile of this.sprung.tiles) tile.index = this.sprung.closed;
+    for (const snake of this.sprung.snakes) snake.setVisible(false);
+    this.sprung = null;
+  }
+
   // ---------------------------------------------------------------- events
+
+  /** Takes a life, stops the player in their tracks and returns how many lives are left. */
+  private loseLife(): number {
+    this.state = 'dying';
+    const lives = (this.registry.get(REG.lives) as number) - 1;
+    this.registry.set(REG.lives, lives);
+    if (this.climbing) this.stopClimbing();
+    this.onStairs = false;
+    (this.player.body as Body).checkCollision.none = true;
+    return lives;
+  }
 
   private hurt(force = false): void {
     if (this.state !== 'playing') return;
     if (!force && this.time.now < this.invulnerableUntil) return;
 
-    this.state = 'dying';
-    const lives = (this.registry.get(REG.lives) as number) - 1;
-    this.registry.set(REG.lives, lives);
-
-    if (this.climbing) this.stopClimbing();
-    this.onStairs = false;
-    const body = this.player.body as Body;
-    body.checkCollision.none = true;
+    const lives = this.loseLife();
     this.player.anims.stop();
     this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
     this.cameras.main.shake(150, 0.01);
@@ -722,7 +820,9 @@ export class GameScene extends Phaser.Scene {
   private respawn(): void {
     const body = this.player.body as Body;
     body.checkCollision.none = false;
-    this.player.clearTint().setPosition(this.spawn.x, this.spawn.y).setVelocity(0, 0);
+    body.moves = true;
+    this.closeTrap();
+    this.player.setCrop().clearTint().setPosition(this.spawn.x, this.spawn.y).setVelocity(0, 0);
     this.invulnerableUntil = this.time.now + PLAYER.invulnerableAfterRespawn;
     for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).forget();
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 100, yoyo: true, repeat: 6, onComplete: () => this.player.setAlpha(1) });

@@ -4,10 +4,13 @@
  *   #  stone wall / floor (solid)   X  crate or barrel (solid)
  *   =  wooden shelf (jump up through it)
  *   H  ladder (Up/Down)              /  \  stairs (walk up them)
- *   ^  rusty spikes                  *  gem
- *   G  gun pickup                    K  key (opens the exit door)
- *   D  exit door                     P  player start
- *   z  zombie (walks)                g  ghost (floats)
+ *   *  gem                           G  gun pickup
+ *   K  key (opens the exit door)     D  exit door
+ *   P  player start                  z  zombie (walks)
+ *   g  ghost (floats)
+ *   T  trapdoor: put it in a floor, in place of a #. It looks almost exactly like
+ *      the floor around it, and drops the player into a pit of snakes. A run of
+ *      T is one wide trapdoor. Zombies are too light to set one off.
  *
  * Decorations (no collision, drawn behind the player):
  *
@@ -53,8 +56,8 @@ const MAP = String.raw`
       ##                    =====       g       ====              g         =====           ##      
     ##                           c                  ww          c                             ##    
   ##                  XX             X              ww    XXX                                   ##  
-##      K   *         XX      z     XX      ^^^           XXX         ^^                          ##
-################  ########################################################################H#########
+##      K   *         XX      z     XX                    XXX                                     ##
+################  ##########################TTT#######################TT##################H#########
 #%                                     %#             %                 #                 H       %#
 #                         v       ww    #                               #         v       H        #
 #         ww                      ww    #               ww              #           g ww  H        #
@@ -62,8 +65,8 @@ const MAP = String.raw`
 #      * *                        **    #                    **         #        * *      H        #
 #     =====                             #                   ====         %      =====     H    *   #
 #                                    b  #                                                 H        #
-#                     ^^             b  #                         ^^^       z             H   * *  #
-##############################  ############        /###############################################
+#                                    b  #                                   z             H   * *  #
+######################TT######  ############        /#############TTT###############################
 #%            #%                  #       %        /##%                     #%                     #
 #             #     v             #               /###      v               #                      #
 #        ww   #         f   f     #     f        /####        ww            #         f     ww     #
@@ -71,16 +74,16 @@ const MAP = String.raw`
 #             #     G             #  * *       /######               * *    #            **        #
 #                 =====             =====     /#######              =====               ====       #
 #               b               b            /########                        b                    #
-#  P            b     * *   z   b           /###M#####          ^^            b z   ^^^         D  #
-######H###################################################H#########################################
+#  P            b     * *   z   b           /###M#####                        b z               D  #
+######H###################################################H#####TT##################TTT#############
 #%    H                       v                          %H       v                               %#
 #     H                                                   H                                        #
 #     H                                                   H                                        #
 #     H    ** c                      * *      c           H                    **   c              #
 #     H   ====                      =====           g     H                   ====                 #
 #     H                                   XX              H                                   * *  #
-#* *  H           ^^^         z           XX    ^^        H     z                       ^^^ X      #
-########################  ############################################   ###########################
+#* *  H                       z           XX              H     z                           X      #
+##################TTT###  ######################TT####################   ###############TTT#########
 `;
 
 /** Wallpaper zones, top to bottom: each starts at a row and runs until the next. */
