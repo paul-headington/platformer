@@ -3,8 +3,18 @@ import { BULLET, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1 } from '../levels/level1';
 
+// Tile indexes in the 'tiles' sheet (see BootScene).
 const BRICK = 0;
 const STONE = 1;
+const LADDER = 2;
+/** The top rung of a ladder, which can be stood on like a ledge. */
+const LADDER_TOP = 3;
+/** Stairs climbing up to the right ('/') and up to the left ('\'). */
+const STAIRS_UP_RIGHT = 4;
+const STAIRS_UP_LEFT = 5;
+/** Stairs can be stepped up or down this far in one frame. */
+const STEP_UP = 10;
+const STEP_DOWN = 8;
 /** Player sheet frames (see tools/sprites.py). */
 const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
 
@@ -30,6 +40,8 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyLeft: Phaser.Input.Keyboard.Key[] = [];
   private keyRight: Phaser.Input.Keyboard.Key[] = [];
+  private keyUp: Phaser.Input.Keyboard.Key[] = [];
+  private keyDown: Phaser.Input.Keyboard.Key[] = [];
   private keyJump: Phaser.Input.Keyboard.Key[] = [];
   private keyFire: Phaser.Input.Keyboard.Key[] = [];
   private keyRestart!: Phaser.Input.Keyboard.Key;
@@ -40,6 +52,10 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
+  private climbing = false;
+  private onStairs = false;
+  /** No grabbing a ladder again straight after jumping off it. */
+  private climbBlockedUntil = 0;
 
   constructor() {
     super('Game');
@@ -48,7 +64,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.state = 'playing';
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
-    this.invulnerableUntil = 0;
+    this.invulnerableUntil = this.climbBlockedUntil = 0;
+    this.climbing = this.onStairs = false;
     pad.reset();
 
     this.registry.set(REG.score, 0);
@@ -59,17 +76,23 @@ export class GameScene extends Phaser.Scene {
 
     this.buildLevel(LEVEL_1);
     this.setupInput();
-    this.say(this.isTouch() ? 'Find the key and reach the door!' : 'Find the key and reach the door!\nArrows: move   Space: jump');
+    this.say(
+      this.isTouch()
+        ? 'Find the key and reach the door!'
+        : 'Find the key and reach the door!\nArrows: move and climb   Space: jump',
+    );
   }
 
   // ---------------------------------------------------------------- level
 
   private buildLevel(rows: string[]): void {
-    const data = rows.map((row) => [...row].map((ch) => (ch === '#' ? BRICK : ch === '=' ? STONE : -1)));
+    const data = rows.map((row, ty) => [...row].map((ch, tx) => GameScene.tileFor(ch, rows[ty - 1]?.[tx])));
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const tileset = map.addTilesetImage('tiles')!;
     this.layer = map.createLayer(0, tileset, 0, 0) as Phaser.Tilemaps.TilemapLayer;
-    this.layer.setCollision([BRICK, STONE]);
+    // Stairs are marked as colliding only so the bricks beside them don't get a wall
+    // edge; tileCollides() lets bodies pass through them and stairSurface() does the rest.
+    this.layer.setCollision([BRICK, STONE, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
 
     const worldWidth = map.widthInPixels;
     this.levelHeight = map.heightInPixels;
@@ -138,9 +161,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, worldWidth, this.levelHeight);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
-    const oneWay = this.oneWayPlatform.bind(this);
-    this.physics.add.collider(this.player, this.layer, undefined, oneWay);
-    this.physics.add.collider(this.zombies, this.layer, undefined, oneWay);
+    const collides = this.tileCollides.bind(this);
+    this.physics.add.collider(this.player, this.layer, undefined, collides);
+    this.physics.add.collider(this.zombies, this.layer, undefined, collides);
     this.physics.add.collider(
       this.bullets,
       this.layer,
@@ -178,12 +201,59 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Stone ledges only block things landing on them from above. */
-  private oneWayPlatform(obj: unknown, tileObj: unknown): boolean {
+  private static tileFor(ch: string, above: string | undefined): number {
+    switch (ch) {
+      case '#': return BRICK;
+      case '=': return STONE;
+      case 'H': return above === 'H' ? LADDER : LADDER_TOP;
+      case '/': return STAIRS_UP_RIGHT;
+      case '\\': return STAIRS_UP_LEFT;
+      default: return -1;
+    }
+  }
+
+  private static isStairs(tile: Phaser.Tilemaps.Tile | null): boolean {
+    return tile?.index === STAIRS_UP_RIGHT || tile?.index === STAIRS_UP_LEFT;
+  }
+
+  /**
+   * Bricks are solid. Stone ledges and ladder tops only block things landing on them
+   * from above, and not a climbing player. Stairs never collide (see stairSurface).
+   */
+  private tileCollides(obj: unknown, tileObj: unknown): boolean {
     const tile = tileObj as Phaser.Tilemaps.Tile;
-    if (tile.index !== STONE) return true;
+    if (tile.index === BRICK) return true;
+    if (GameScene.isStairs(tile)) return false;
+    if (obj === this.player && this.climbing) return false;
     const body = (obj as Sprite).body as Body;
     return body.velocity.y >= 0 && body.prev.y + body.height <= tile.pixelY + 2;
+  }
+
+  private ladderAt(x: number, y: number): Phaser.Tilemaps.Tile | null {
+    const tile = this.layer.getTileAtWorldXY(x, y);
+    return tile && (tile.index === LADDER || tile.index === LADDER_TOP) ? tile : null;
+  }
+
+  /**
+   * The y of the stair step under the player's feet, or null. Steps are 4px tall,
+   * matching the art. Both feet are checked and the higher step wins, so the player
+   * steps up onto the next stair instead of walking into it.
+   */
+  private stairSurface(body: Body, maxDrop: number): number | null {
+    let best: number | null = null;
+    for (const x of [body.left + 0.5, body.right - 0.5]) {
+      const tx = Math.floor(x / TILE);
+      const lx = x - tx * TILE;
+      const step = Math.floor(lx / 4);
+      for (let ty = Math.floor((body.bottom - STEP_UP) / TILE); ty <= Math.floor((body.bottom + maxDrop) / TILE); ty++) {
+        const tile = this.layer.getTileAt(tx, ty);
+        if (!GameScene.isStairs(tile)) continue;
+        const y = ty * TILE + (tile!.index === STAIRS_UP_RIGHT ? 12 - 4 * step : 4 * step);
+        if (y < body.bottom - STEP_UP || y > body.bottom + maxDrop) continue;
+        if (best === null || y < best) best = y;
+      }
+    }
+    return best;
   }
 
   // ---------------------------------------------------------------- input
@@ -194,7 +264,10 @@ export class GameScene extends Phaser.Scene {
     this.cursors = kb.createCursorKeys();
     this.keyLeft = [this.cursors.left, kb.addKey(K.A)];
     this.keyRight = [this.cursors.right, kb.addKey(K.D)];
-    this.keyJump = [this.cursors.up, this.cursors.space, kb.addKey(K.W), kb.addKey(K.Z)];
+    // Up climbs a ladder when there is one, and jumps otherwise.
+    this.keyUp = [this.cursors.up, kb.addKey(K.W)];
+    this.keyDown = [this.cursors.down, kb.addKey(K.S)];
+    this.keyJump = [this.cursors.space, kb.addKey(K.Z)];
     this.keyFire = [kb.addKey(K.X), kb.addKey(K.CTRL)];
     this.keyRestart = kb.addKey(K.ENTER);
   }
@@ -233,25 +306,67 @@ export class GameScene extends Phaser.Scene {
   private updatePlayer(time: number): void {
     const p = this.player;
     const body = p.body as Body;
-    const onGround = body.blocked.down || body.touching.down;
-    if (onGround) this.lastGroundedAt = time;
 
+    // Read every input once, so no "just pressed" flag is left stale.
     const left = GameScene.anyDown(this.keyLeft) || pad.isDown('left');
     const right = GameScene.anyDown(this.keyRight) || pad.isDown('right');
+    const up = GameScene.anyDown(this.keyUp) || pad.isDown('up');
+    const down = GameScene.anyDown(this.keyDown) || pad.isDown('down');
+    const upKeyPressed = GameScene.anyJustDown(this.keyUp);
+    const upPressed = pad.justDown('up') || upKeyPressed;
+    const jumpKeyPressed = GameScene.anyJustDown(this.keyJump);
+    const jumpPressed = pad.justDown('jump') || jumpKeyPressed;
+    const releasedKeys = GameScene.anyJustUp(this.keyJump) || GameScene.anyJustUp(this.keyUp);
+    const padReleased = [pad.justUp('jump'), pad.justUp('up')].some(Boolean);
+    const jumpReleased = releasedKeys || padReleased;
+    const fireKey = GameScene.anyJustDown(this.keyFire);
+    if (pad.justDown('fire') || fireKey) this.shoot(time);
+
+    if (this.climbing) {
+      this.updateClimbing(left || right, up, down, jumpPressed, time);
+      return;
+    }
+
+    // Grab a ladder: Up when in front of one, Down when standing on top of one.
+    const onSolidGround = body.blocked.down || body.touching.down;
+    if (time >= this.climbBlockedUntil) {
+      const inFront = up && (this.ladderAt(body.center.x, body.bottom - 4) ?? this.ladderAt(body.center.x, body.center.y));
+      const below = down && onSolidGround && !this.onStairs && this.ladderAt(body.center.x, body.bottom + 2);
+      const ladder = inFront || below;
+      if (ladder) {
+        this.startClimbing(ladder, below ? 3 : 0);
+        return;
+      }
+    }
+
+    // Walk up and down stairs by standing the player on the step under their feet.
+    const wasOnStairs = this.onStairs;
+    this.onStairs = false;
+    if (body.velocity.y >= 0) {
+      const surface = this.stairSurface(body, wasOnStairs || onSolidGround ? STEP_DOWN : 0);
+      if (surface !== null) {
+        body.position.y += surface - body.bottom;
+        body.velocity.y = 0;
+        this.onStairs = true;
+      }
+    }
+
+    const onGround = onSolidGround || this.onStairs;
+    if (onGround) this.lastGroundedAt = time;
+
     if (left && !right) p.setVelocityX(-PLAYER.runSpeed).setFlipX(true);
     else if (right && !left) p.setVelocityX(PLAYER.runSpeed).setFlipX(false);
     else p.setVelocityX(0);
 
-    const jumpKey = GameScene.anyJustDown(this.keyJump);
-    if (pad.justDown('jump') || jumpKey) this.jumpPressedAt = time;
+    if (jumpPressed || upPressed) this.jumpPressedAt = time;
     const canJump = time - this.lastGroundedAt <= PLAYER.coyoteTime;
     if (time - this.jumpPressedAt <= PLAYER.jumpBuffer && canJump) {
       p.setVelocityY(-PLAYER.jumpVelocity);
       this.jumpPressedAt = this.lastGroundedAt = -Infinity;
+      this.onStairs = false;
     }
     // Letting go of jump early gives a shorter hop.
-    const jumpReleased = GameScene.anyJustUp(this.keyJump);
-    if ((pad.justUp('jump') || jumpReleased) && body.velocity.y < 0) body.velocity.y *= 0.45;
+    if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     if (!onGround) {
       p.anims.stop();
@@ -261,9 +376,64 @@ export class GameScene extends Phaser.Scene {
     } else {
       p.anims.play('player-idle', true);
     }
+  }
 
-    const fireKey = GameScene.anyJustDown(this.keyFire);
-    if (pad.justDown('fire') || fireKey) this.shoot(time);
+  // ---------------------------------------------------------------- ladders
+
+  /** Lines the player up with the ladder and switches off gravity. */
+  private startClimbing(ladder: Phaser.Tilemaps.Tile, nudgeDown: number): void {
+    const body = this.player.body as Body;
+    this.climbing = true;
+    this.onStairs = false;
+    body.setAllowGravity(false);
+    // The body has already moved this frame, so move it rather than the sprite.
+    body.position.x += ladder.getCenterX() - body.center.x;
+    body.position.y += nudgeDown;
+    this.player.setVelocity(0, 0);
+    this.player.anims.play('player-climb');
+  }
+
+  private stopClimbing(): void {
+    this.climbing = false;
+    (this.player.body as Body).setAllowGravity(true);
+    this.player.anims.stop();
+  }
+
+  private updateClimbing(sideways: boolean, up: boolean, down: boolean, jumpPressed: boolean, time: number): void {
+    const p = this.player;
+    const body = p.body as Body;
+
+    if (jumpPressed) {
+      this.stopClimbing();
+      this.climbBlockedUntil = time + 300;
+      p.setVelocityY(-PLAYER.jumpVelocity * 0.75);
+      return;
+    }
+    // Step off at the bottom, either by walking away or by climbing down onto the floor.
+    if (body.blocked.down && (sideways || down)) {
+      this.stopClimbing();
+      return;
+    }
+
+    if (!this.ladderAt(body.center.x, body.bottom - 1)) {
+      const top = this.ladderAt(body.center.x, body.bottom + 1);
+      if (!top) {
+        this.stopClimbing(); // climbed off the bottom of a ladder with no floor under it
+        return;
+      }
+      if (!down) {
+        // Climbed out of the top: stand on the top rung.
+        body.position.y += top.pixelY - body.bottom;
+        this.stopClimbing();
+        p.setVelocityY(0);
+        return;
+      }
+    }
+
+    const vy = up === down ? 0 : up ? -PLAYER.climbSpeed : PLAYER.climbSpeed;
+    p.setVelocity(0, vy);
+    if (vy === 0) p.anims.pause();
+    else if (p.anims.isPaused) p.anims.resume();
   }
 
   private shoot(time: number): void {
@@ -288,7 +458,8 @@ export class GameScene extends Phaser.Scene {
       const body = z.body as Body;
       let dir = z.getData('dir') as number;
       const ahead = z.x + dir * 7;
-      const floorAhead = this.layer.getTileAtWorldXY(ahead, body.bottom + 2);
+      const tile = this.layer.getTileAtWorldXY(ahead, body.bottom + 2);
+      const floorAhead = tile?.collides && !GameScene.isStairs(tile);
       if ((dir < 0 && body.blocked.left) || (dir > 0 && body.blocked.right) || (body.blocked.down && !floorAhead)) {
         dir = -dir;
         z.setData('dir', dir);
@@ -314,6 +485,8 @@ export class GameScene extends Phaser.Scene {
     const lives = (this.registry.get(REG.lives) as number) - 1;
     this.registry.set(REG.lives, lives);
 
+    if (this.climbing) this.stopClimbing();
+    this.onStairs = false;
     const body = this.player.body as Body;
     body.checkCollision.none = true;
     this.player.anims.stop();

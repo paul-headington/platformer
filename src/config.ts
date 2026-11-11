@@ -5,6 +5,7 @@ export const GAME_HEIGHT = 200;
 
 export const PLAYER = {
   runSpeed: 110,
+  climbSpeed: 70,
   jumpVelocity: 300,
   gravity: 700,
   /** Grace period to still jump just after running off a ledge (ms). */

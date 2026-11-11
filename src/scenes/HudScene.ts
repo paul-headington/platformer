@@ -59,9 +59,15 @@ export class HudScene extends Phaser.Scene {
 
   private createTouchControls(): void {
     this.input.addPointer(3); // up to four fingers at once
+    // A d-pad on the left (up and down climb ladders), FIRE and JUMP on the right.
+    const cx = 48;
+    const cy = GAME_HEIGHT - 44;
+    const tri = (x: number, y: number, ...pts: number[]) => this.add.triangle(x, y, ...pts, 0xffffff);
+    this.touchButton('left', cx - 26, cy, (x, by) => tri(x, by, 6, 0, 6, 12, 0, 6), 13, { x: 18, w: 36, h: 40 });
+    this.touchButton('right', cx + 26, cy, (x, by) => tri(x, by, 0, 0, 0, 12, 6, 6), 13, { x: 78, w: 36, h: 40 });
+    this.touchButton('up', cx, cy - 24, (x, by) => tri(x, by, 0, 6, 12, 6, 6, 0), 13, { y: cy - 28, w: 28, h: 32 });
+    this.touchButton('down', cx, cy + 24, (x, by) => tri(x, by, 0, 0, 12, 0, 6, 6), 13, { y: cy + 28, w: 28, h: 32 });
     const y = GAME_HEIGHT - 28;
-    this.touchButton('left', 26, y, (x, by) => this.add.triangle(x, by, 6, 0, 6, 12, 0, 6, 0xffffff));
-    this.touchButton('right', 70, y, (x, by) => this.add.triangle(x, by, 0, 0, 0, 12, 6, 6, 0xffffff));
     this.touchButton('fire', GAME_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'));
     this.touchButton('jump', GAME_WIDTH - 26, y, (x, by) => this.labelFor(x, by, 'JUMP'));
 
@@ -84,11 +90,13 @@ export class HudScene extends Phaser.Scene {
     x: number,
     y: number,
     icon: (x: number, y: number) => { setAlpha(value: number): unknown },
+    radius = 17,
+    area: { x?: number; y?: number; w?: number; h?: number } = {},
   ): void {
-    const ring = this.add.circle(x, y, 17, 0xffffff, 0.12).setStrokeStyle(1, 0xffffff, 0.5);
+    const ring = this.add.circle(x, y, radius, 0xffffff, 0.12).setStrokeStyle(1, 0xffffff, 0.5);
     icon(x, y).setAlpha(0.8);
     // The touch area is larger than the drawn button so it's easy to hit without looking.
-    const zone = this.add.zone(x, y, 44, 56).setInteractive();
+    const zone = this.add.zone(area.x ?? x, area.y ?? y, area.w ?? 44, area.h ?? 56).setInteractive();
     const down = () => {
       pad.press(button);
       ring.setFillStyle(0xffffff, 0.35);

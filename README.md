@@ -18,12 +18,13 @@ Find the key, then reach the exit door. Pick up the gun to shoot zombies and gho
 
 | Action | Keys |
 | --- | --- |
-| Move | Arrow keys or A / D |
-| Jump | Space, Up, W or Z (hold for a higher jump) |
+| Move (and walk up and down stairs) | Arrow keys or A / D |
+| Jump | Space or Z (hold for a higher jump). Up and W also jump when you're not at a ladder |
+| Climb a ladder | Up / Down (or W / S). Down on the top of a ladder climbs down; jump to let go |
 | Shoot (once you have the gun) | X or Ctrl |
 | Restart after winning or game over | Enter |
 
-On phones and tablets, on-screen buttons appear automatically (left, right, FIRE, JUMP), and you tap anywhere to restart. Hold the device sideways.
+On phones and tablets, on-screen buttons appear automatically (a d-pad for moving and climbing, FIRE, JUMP), and you tap anywhere to restart. Hold the device sideways.
 
 ## Platforms
 
@@ -61,3 +62,4 @@ In dev mode (`npm run dev`) the game is available as `window.game` in the browse
 2. Project skeleton and placeholder art. Done.
 3. One playable level: enemies, weapon pickup, collectibles, death and respawn, exit door. Done.
 4. Package for web, desktop and mobile. Done: touch controls, installable web app, GitHub Pages deploy, Electron desktop app.
+5. Vertical levels: ladders, stairs and a camera that scrolls up and down. Level 1 is now three floors tall.
