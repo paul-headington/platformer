@@ -18,9 +18,9 @@ PALETTE = {
     'w': (255, 255, 255),
     's': (242, 194, 139),  # skin
     'S': (201, 143, 94),   # skin shade
-    'h': (47, 168, 154),   # beanie
-    'H': (29, 110, 102),   # beanie shade
-    'i': (126, 220, 204),  # beanie highlight
+    'h': (214, 42, 48),    # cap
+    'H': (140, 20, 32),    # cap shade / brim
+    'i': (255, 118, 104),  # cap highlight
     'n': (92, 60, 40),     # hair
     'j': (232, 118, 45),   # jacket
     'J': (169, 76, 26),    # jacket shade
@@ -52,11 +52,11 @@ PALETTE = {
 # drawn facing right; Phaser flips them for walking left.
 
 HEAD = """
-....kkkkk...
-..kkhhhiikk.
-.khhhhhhhihk
-.khhhhhhhhhk
-kHHHHHHHHHHk
+...kkkkkk......
+..khhhiihk.....
+.khhhhhhihk....
+.khhhhhhhhhkkk.
+kHHHHHHHHHHHHHk
 .knnssssssk.
 .knssswksk..
 .knssssssssk
@@ -162,11 +162,11 @@ LEGS_DANGLE = """
 """
 
 HEAD_BACK = """
-....kkkkk...
-..kkhhhiikk.
-.khhhhhhhihk
-.khhhhhhhhhk
-kHHHHHHHHHHk
+...kkkkkk...
+..khhhiihk..
+.khhhhhhihhk
+.khhhkkhhhhk
+kHHHknnkHHHk
 .knnnnnnnnk.
 .knnnnnnnnk.
 .knnnnnnnnk.
