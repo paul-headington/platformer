@@ -14,6 +14,7 @@
  *   w  window; draw it 2x2 (ww on two rows)   %  cobweb; put it in a corner
  *   f  portrait                                b  bookcase; two rows tall
  *   c  candle on a wall sconce
+ *   v  air vent, high on a wall. Tentacles reach out of it now and then.
  *   M  the thing in the cupboard under the stairs; its bottom-left tile, inside a
  *      solid block at least 2x2. Counts as wall.
  *
@@ -55,7 +56,7 @@ const MAP = String.raw`
 ##      K   *         XX      z     XX      ^^^           XXX         ^^                          ##
 ################  ########################################################################H#########
 #%                                     %#             %                 #                 H       %#
-#                                 ww    #                               #                 H        #
+#                         v       ww    #                               #         v       H        #
 #         ww                      ww    #               ww              #           g ww  H        #
 #   c     ww    f   g     c             #               ww    c g   f   # c   f       ww  H c      #
 #      * *                        **    #                    **         #        * *      H        #
@@ -64,7 +65,7 @@ const MAP = String.raw`
 #                     ^^             b  #                         ^^^       z             H   * *  #
 ##############################  ############        /###############################################
 #%            #%                  #       %        /##%                     #%                     #
-#             #                   #               /###                      #                      #
+#             #     v             #               /###      v               #                      #
 #        ww   #         f   f     #     f        /####        ww            #         f     ww     #
 # c      ww c #           c       #             /#####        ww  c   g   c #               ww    c#
 #             #     G             #  * *       /######               * *    #            **        #
@@ -72,7 +73,7 @@ const MAP = String.raw`
 #               b               b            /########                        b                    #
 #  P            b     * *   z   b           /###M#####          ^^            b z   ^^^         D  #
 ######H###################################################H#########################################
-#%    H                                                  %H                                       %#
+#%    H                       v                          %H       v                               %#
 #     H                                                   H                                        #
 #     H                                                   H                                        #
 #     H    ** c                      * *      c           H                    **   c              #

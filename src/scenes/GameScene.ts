@@ -28,7 +28,7 @@ const BACK: Record<BackStyle, [number, number, number]> = {
 };
 const BACK_FLOOR_GAP = 8;
 /** Frames in the 'decor' sheet. */
-const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase: 8 } as const;
+const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase: 8, vent: 10 } as const;
 /** Stairs can be stepped up or down this far in one frame. */
 const STEP_UP = 10;
 const STEP_DOWN = 8;
@@ -309,6 +309,9 @@ export class GameScene extends Phaser.Scene {
             return DECOR.portrait + (tx % 2);
           case 'b':
             return DECOR.bookcase + (rows[ty - 1]?.[tx] === 'b' ? 1 : 0);
+          case 'v':
+            this.addTentacle(tx * TILE, ty * TILE);
+            return DECOR.vent;
           default:
             return -1;
         }
@@ -324,6 +327,34 @@ export class GameScene extends Phaser.Scene {
         }
       }),
     );
+  }
+
+  /**
+   * Scenery: every so often a tentacle slides down out of an air vent, sways about
+   * and pulls back in. It is drawn between the wallpaper and the vent's slats, so
+   * it really looks like it comes out of the duct. It hides if the player is close.
+   */
+  private addTentacle(left: number, top: number): void {
+    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setOrigin(0, 0).setDepth(-2.5);
+    const tooClose = () => Math.abs(this.player.x - left - 8) < TILE * 2 && Math.abs(this.player.y - top - 16) < TILE * 3;
+    const out = [1, 2, 3, 4, 3, 5, 4, 3, 5, 4, 3];
+    let i = 0;
+    const retract = (then: number) => {
+      tentacle.setFrame(1);
+      this.time.delayedCall(90, () => tentacle.setFrame(0));
+      this.time.delayedCall(then, reach);
+    };
+    const reach = () => {
+      i = 0;
+      const step = () => {
+        if (tooClose()) return retract(Phaser.Math.Between(2500, 4000));
+        if (i >= out.length) return retract(Phaser.Math.Between(4000, 9000));
+        tentacle.setFrame(out[i++]);
+        this.time.delayedCall(i <= 2 ? 160 : 320, step);
+      };
+      step();
+    };
+    this.time.delayedCall(Phaser.Math.Between(1000, 6000), reach);
   }
 
   /**

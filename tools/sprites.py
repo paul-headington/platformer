@@ -820,6 +820,43 @@ def bookcase_art():
     return [c.crop(0, 0, 16, 16), c.crop(0, 16, 16, 16)]
 
 
+def vent_art():
+    """A 16x16 iron air vent: a dark duct behind four slats."""
+    c = Canvas(16, 16)
+    c.rect(1, 2, 14, 11, 'M')
+    c.rect(2, 3, 12, 9, 'k')
+    for y in (4, 6, 8, 10):
+        c.rect(2, y, 12, 1, 'm')
+    c.rect(1, 2, 14, 1, 'l')
+    for x, y in ((2, 3), (13, 3), (2, 11), (13, 11)):
+        c.px(x, y, 'l')                  # screws
+    return c.crop(0, 0, 16, 16)
+
+
+def tentacle_art(length, sway, curl=False):
+    """
+    A 24x32 tentacle hanging down out of a vent (the vent is the middle 16px of
+    the top tile, and its slats are drawn over the tentacle).
+    length: pixels below the vent; sway: how far the tip swings sideways.
+    """
+    import math
+    c = Canvas(24, 32)
+    if length <= 0:
+        return c.crop(0, 0, 24, 32)
+    top, n = 4, 8 + length
+    for i in range(n):
+        t = i / max(n - 1, 1)
+        x = 11.5 + sway * math.sin(t * 2.4) * t + (3 * math.sin(t * 9) * t * t if curl else 0)
+        y = top + i
+        r = 4.6 * (1 - t) + 0.9
+        for xx in range(int(x - r), int(x + r) + 1):
+            if abs(xx + 0.5 - x) <= r:
+                c.px(xx, y, 'G' if xx + 0.5 > x + r * 0.4 else 'g')
+        if i % 3 == 1 and r > 1.5:
+            c.px(round(x - r * 0.55), y, 'p')    # suckers down one side
+    return c.crop(0, 0, 24, 32)
+
+
 def lurker_art(eyes, look=0, fingers=False):
     """
     A 32x32 cupboard under the stairs, its door ajar, with something inside.
@@ -940,6 +977,8 @@ SPIKE_PAL = {'l': (206, 184, 168), 'm': (150, 96, 70), 'M': (96, 58, 46), 'r': (
 DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
             'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
 
+VENT_PAL = {'M': (44, 44, 54), 'm': (92, 94, 108), 'l': (130, 132, 146), 'k': (6, 4, 10)}
+TENTACLE_PAL = {'g': (104, 70, 120), 'G': (70, 44, 86), 'p': (206, 160, 190)}
 LURKER_PAL = {'F': (60, 42, 36), 'f': (86, 60, 46), 'k': (6, 4, 10), 'K': (12, 9, 18), 'W': (84, 56, 40),
               'w': (110, 76, 52), 'x': (52, 34, 26), 'y': (196, 150, 60), 'e': (226, 246, 110),
               'E': (150, 170, 60), 'p': (40, 8, 8), 'g': (150, 148, 136), 'G': (100, 98, 92), 'c': (226, 224, 206)}
@@ -959,12 +998,16 @@ TILE_SHEETS = {
              (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
              (FLOOR_GAP, ATTIC_PAL)],
     # 0-3 window (top-left, top-right, bottom-left, bottom-right), 4-5 cobweb (left, right corner),
-    # 6-7 portraits, 8-9 bookcase (top, bottom)
+    # 6-7 portraits, 8-9 bookcase (top, bottom), 10 air vent
     'decor': [(w, WINDOW_PAL) for w in WINDOW] + [(COBWEB, DECOR_PAL), (mirror(COBWEB), DECOR_PAL),
-              (PORTRAIT_LADY, DECOR_PAL), (PORTRAIT_MOON, DECOR_PAL)] + [(b, BOOK_PAL) for b in BOOKCASE],
+              (PORTRAIT_LADY, DECOR_PAL), (PORTRAIT_MOON, DECOR_PAL)] + [(b, BOOK_PAL) for b in BOOKCASE] +
+             [(vent_art(), VENT_PAL)],
     'candle': [(f, CANDLE_PAL) for f in CANDLE],
     'spikes': [(SPIKES, SPIKE_PAL)],
     'door': [(door_art(False), DOOR_PAL), (door_art(True), DOOR_PAL)],
+    # Tentacles reaching out of a vent: 0 none, 1-2 sliding out, 3-5 swaying
+    'tentacle': [(tentacle_art(l, sw, cu), TENTACLE_PAL) for l, sw, cu in
+                 [(0, 0, False), (5, 0, False), (11, 3, False), (18, -7, False), (19, 7, False), (18, 2, True)]],
     # The thing under the stairs: 0 dark, 1 eyes, 2 blink, 3 looking left, 4 looking right, 5 fingers out
     'lurker': [(lurker_art(None), LURKER_PAL), (lurker_art('open'), LURKER_PAL), (lurker_art('half'), LURKER_PAL),
                (lurker_art('open', -1), LURKER_PAL), (lurker_art('open', 1), LURKER_PAL),
