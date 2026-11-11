@@ -14,14 +14,15 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.load.setPath('sprites/');
+    // The build id in each URL stops a browser from mixing new code with old cached sprites.
     // Frame layouts are documented in tools/sprites.py.
-    this.load.spritesheet('player', 'player.png', { frameWidth: 20, frameHeight: 24 });
-    this.load.spritesheet('zombie', 'zombie.png', { frameWidth: 20, frameHeight: 24 });
-    this.load.spritesheet('ghost', 'ghost.png', { frameWidth: 20, frameHeight: 20 });
-    this.load.spritesheet('gem', 'gem.png', { frameWidth: 8, frameHeight: 8 });
-    this.load.image('key', 'key.png');
-    this.load.image('gun', 'gun.png');
-    this.load.image('bullet', 'bullet.png');
+    this.load.spritesheet('player', `player.png?v=${__BUILD_ID__}`, { frameWidth: 20, frameHeight: 24 });
+    this.load.spritesheet('zombie', `zombie.png?v=${__BUILD_ID__}`, { frameWidth: 20, frameHeight: 24 });
+    this.load.spritesheet('ghost', `ghost.png?v=${__BUILD_ID__}`, { frameWidth: 20, frameHeight: 20 });
+    this.load.spritesheet('gem', `gem.png?v=${__BUILD_ID__}`, { frameWidth: 8, frameHeight: 8 });
+    this.load.image('key', `key.png?v=${__BUILD_ID__}`);
+    this.load.image('gun', `gun.png?v=${__BUILD_ID__}`);
+    this.load.image('bullet', `bullet.png?v=${__BUILD_ID__}`);
   }
 
   create(): void {
@@ -72,7 +73,12 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(0xc9ced8);
       for (let i = 0; i < 4; i++) g.fillTriangle(i * 4, 16, i * 4 + 2, 8, i * 4 + 4, 16);
     });
-    const frames = (key: string, list: number[]) => this.anims.generateFrameNumbers(key, { frames: list });
+    // Skips frames the sheet doesn't have (an old cached sheet, say) so a missing frame can't crash the game.
+    const frames = (key: string, list: number[]) => {
+      const tex = this.textures.get(key);
+      const have = list.filter((f) => tex.has(f as unknown as string));
+      return this.anims.generateFrameNumbers(key, { frames: have.length > 0 ? have : [0] });
+    };
     this.anims.create({ key: 'player-idle', frames: frames('player', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
     this.anims.create({ key: 'player-climb', frames: frames('player', [8, 9]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'player-run', frames: frames('player', [2, 3, 4, 5]), frameRate: 10, repeat: -1 });
