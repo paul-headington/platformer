@@ -47,6 +47,9 @@ export class BootScene extends Phaser.Scene {
     this.anims.create({ key: 'player-idle', frames: frames('player', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
     this.anims.create({ key: 'player-climb', frames: frames('player', [8, 9]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'player-run', frames: frames('player', [2, 3, 4, 5]), frameRate: 10, repeat: -1 });
+    // The same idle and run, holding the gun (frames 10-15), once it has been picked up.
+    this.anims.create({ key: 'player-idle-gun', frames: frames('player', [10, 10, 10, 11]), frameRate: 3, repeat: -1 });
+    this.anims.create({ key: 'player-run-gun', frames: frames('player', [12, 13, 14, 15]), frameRate: 10, repeat: -1 });
     this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
     this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
