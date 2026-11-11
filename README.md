@@ -16,6 +16,8 @@ npm run desktop    # build and open it as a desktop app (Electron)
 
 Find the key, then reach the exit door. Pick up the gun to shoot zombies and ghosts. Gems are worth points. Spikes, enemies and pits cost a life; you have three.
 
+Zombies wander their floor until they spot you ahead of them (or hear you right behind them). Then they chase you, following you up and down stairs and ladders and dropping through holes in the floor. They are slower than you and cannot jump, so hop onto a shelf or over a crate to get away; lose them for a few seconds and they give up.
+
 | Action | Keys |
 | --- | --- |
 | Move (and walk up and down stairs) | Arrow keys or A / D |
