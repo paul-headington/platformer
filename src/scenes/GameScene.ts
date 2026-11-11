@@ -5,6 +5,8 @@ import { LEVEL_1 } from '../levels/level1';
 
 const BRICK = 0;
 const STONE = 1;
+/** Player sheet frames (see tools/sprites.py). */
+const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -92,7 +94,8 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case '*': {
-            const gem = gems.create(cx, cy, 'gem') as Phaser.Physics.Arcade.Image;
+            const gem = gems.create(cx, cy, 'gem') as Sprite;
+            gem.play({ key: 'gem-sparkle', startFrame: tx % 4 });
             this.tweens.add({ targets: gem, y: cy - 2, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: tx * 40 });
             break;
           }
@@ -111,13 +114,13 @@ export class GameScene extends Phaser.Scene {
             break;
           case 'z': {
             const z = this.zombies.create(cx, bottom - 8, 'zombie', 0) as Sprite;
-            (z.body as Body).setSize(10, 16).setOffset(1, 0);
+            (z.body as Body).setSize(9, 15).setOffset(3, 1);
             z.setData('dir', -1).play('zombie-walk');
             break;
           }
           case 'g': {
             const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
-            (gh.body as Body).setSize(10, 10).setOffset(2, 2);
+            (gh.body as Body).setSize(10, 10).setOffset(3, 3);
             gh.setData({ ox: cx, oy: cy, phase: tx }).setAlpha(0.85).play('ghost-float');
             break;
           }
@@ -126,7 +129,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0);
-    (this.player.body as Body).setSize(8, 15).setOffset(2, 1);
+    (this.player.body as Body).setSize(8, 15).setOffset(4, 1);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     // Open bottom edge so falling into a pit is possible.
@@ -252,12 +255,11 @@ export class GameScene extends Phaser.Scene {
 
     if (!onGround) {
       p.anims.stop();
-      p.setFrame(3);
+      p.setFrame(body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall);
     } else if (body.velocity.x !== 0) {
       p.anims.play('player-run', true);
     } else {
-      p.anims.stop();
-      p.setFrame(0);
+      p.anims.play('player-idle', true);
     }
 
     const fireKey = GameScene.anyJustDown(this.keyFire);
@@ -315,7 +317,7 @@ export class GameScene extends Phaser.Scene {
     const body = this.player.body as Body;
     body.checkCollision.none = true;
     this.player.anims.stop();
-    this.player.setFrame(3).setTint(0xff4040).setVelocity(0, -220);
+    this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
     this.cameras.main.shake(150, 0.01);
 
     this.time.delayedCall(1000, () => (lives > 0 ? this.respawn() : this.gameOver()));

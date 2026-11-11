@@ -45,7 +45,8 @@ npm run desktop:dist    # make an installer for the current OS into release/
 - `src/main.ts`: game config (320x200 resolution scaled up with crisp pixels, arcade physics).
 - `src/config.ts`: shared constants such as tile size and player speed.
 - `src/levels/level1.ts`: the level, drawn as text with one character per tile. Edit it to change the layout; the legend is at the top of the file.
-- `src/scenes/BootScene.ts`: generates placeholder art in code, so no image files are needed yet.
+- `src/scenes/BootScene.ts`: loads the sprite sheets and sets up animations. Tiles, spikes and the door are still drawn in code as placeholders.
+- `tools/sprites.py`: the character and pickup sprites, drawn as text pixel maps. Edit a map, run `python3 tools/sprites.py --preview` (needs Pillow), and it rewrites `public/sprites/*.png` and `docs/sprite-preview.png`.
 - `src/scenes/GameScene.ts`: builds the level and runs the player, enemies, pickups, lives and win/lose rules.
 - `src/scenes/HudScene.ts`: score, lives and item bar, on-screen messages, and the touch buttons.
 - `src/input/VirtualPad.ts`: touch button state, read by the game alongside the keyboard.
