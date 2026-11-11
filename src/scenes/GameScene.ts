@@ -90,6 +90,8 @@ export class GameScene extends Phaser.Scene {
   private lockedHintAt = -Infinity;
   private climbing = false;
   private onStairs = false;
+  /** What the camera follows: the player's x, but the height of the floor they last stood on. */
+  private cameraTarget = new Phaser.Math.Vector2();
   /** No grabbing a ladder again straight after jumping off it. */
   private climbBlockedUntil = 0;
 
@@ -230,7 +232,12 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
     this.physics.world.setBoundsCollision(true, true, true, false);
     this.cameras.main.setBounds(0, 0, worldWidth, this.levelHeight);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    // Follow a point that tracks the player sideways but only changes height when they land,
+    // climb or fall below the floor, so the screen doesn't bob up and down with every jump.
+    // It is moved after physics has placed the player each frame, so it is never a frame behind.
+    this.cameraTarget.set(this.player.x, this.player.y);
+    this.cameras.main.startFollow(this.cameraTarget, true, 0.12, 0.12);
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.updateCameraTarget, this);
 
     const collides = this.tileCollides.bind(this);
     this.physics.add.collider(this.player, this.layer, undefined, collides);
@@ -572,6 +579,14 @@ export class GameScene extends Phaser.Scene {
     this.checkTrapdoors();
 
     if (this.player.y > this.levelHeight + TILE) this.hurt(true);
+  }
+
+  private updateCameraTarget(): void {
+    const p = this.player;
+    const body = p.body as Body;
+    const grounded = body.blocked.down || body.touching.down || this.onStairs || this.climbing;
+    this.cameraTarget.x = p.x;
+    if (grounded || this.state !== 'playing' || p.y > this.cameraTarget.y) this.cameraTarget.y = p.y;
   }
 
   private updatePlayer(time: number): void {
