@@ -7,13 +7,40 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "phaser": "^4.2.1"
+    "typecheck": "tsc --noEmit",
+    "desktop": "npm run build && electron .",
+    "desktop:dist": "npm run build && electron-builder"
   },
   "devDependencies": {
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
+    "phaser": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^8.3.8"
+  },
+  "description": "A retro side-scrolling platformer.",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "io.github.paulheadington.platformer",
+    "productName": "Platformer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    }
   }
 }
