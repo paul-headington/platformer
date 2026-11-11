@@ -16,6 +16,13 @@ export const PLAYER = {
   invulnerableAfterRespawn: 1500,
 };
 
+export const CAMERA = {
+  /** Share of the distance to the player the camera covers each 1/60 s. */
+  lerp: 0.12,
+  /** The camera never moves slower than this (px/s) until it arrives, so scrolls end cleanly. */
+  minSpeed: 60,
+};
+
 export const BULLET = { speed: 320, cooldown: 280, maxOnScreen: 3 };
 export const ZOMBIE = {
   /** Wandering speed. */

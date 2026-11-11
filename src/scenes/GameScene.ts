@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { NavGrid } from '../ai/NavGrid';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
-import { BULLET, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE } from '../config';
+import { BULLET, CAMERA, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -92,6 +92,8 @@ export class GameScene extends Phaser.Scene {
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
   private cameraTarget = new Phaser.Math.Vector2();
+  /** The camera's scroll position, eased towards cameraTarget each frame. */
+  private cameraPos = new Phaser.Math.Vector2();
   /** No grabbing a ladder again straight after jumping off it. */
   private climbBlockedUntil = 0;
 
@@ -236,8 +238,9 @@ export class GameScene extends Phaser.Scene {
     // climb or fall below the floor, so the screen doesn't bob up and down with every jump.
     // It is moved after physics has placed the player each frame, so it is never a frame behind.
     this.cameraTarget.set(this.player.x, this.player.y);
-    this.cameras.main.startFollow(this.cameraTarget, true, 0.12, 0.12);
-    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.updateCameraTarget, this);
+    this.cameraPos.set(this.cameraScrollFor('x'), this.cameraScrollFor('y'));
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.updateCamera, this);
+    this.updateCamera();
 
     const collides = this.tileCollides.bind(this);
     this.physics.add.collider(this.player, this.layer, undefined, collides);
@@ -581,12 +584,39 @@ export class GameScene extends Phaser.Scene {
     if (this.player.y > this.levelHeight + TILE) this.hurt(true);
   }
 
-  private updateCameraTarget(): void {
+  /**
+   * Moves the camera towards the player. It eases in like a lerp, but never slower than
+   * CAMERA.minSpeed, and stops dead once it arrives. A plain lerp spends its last few pixels
+   * crawling, so the screen ends each scroll with uneven one-pixel nudges spread over half a
+   * second, which looks rough at this resolution.
+   */
+  private updateCamera(): void {
     const p = this.player;
     const body = p.body as Body;
     const grounded = body.blocked.down || body.touching.down || this.onStairs || this.climbing;
     this.cameraTarget.x = p.x;
     if (grounded || this.state !== 'playing' || p.y > this.cameraTarget.y) this.cameraTarget.y = p.y;
+
+    const dt = Math.min(this.game.loop.delta, 1000 / 30) / 1000;
+    const ease = 1 - Math.pow(1 - CAMERA.lerp, dt * 60); // the same feel at any frame rate
+    const minStep = CAMERA.minSpeed * dt;
+    const cam = this.cameras.main;
+    for (const axis of ['x', 'y'] as const) {
+      const gap = this.cameraScrollFor(axis) - this.cameraPos[axis];
+      const step = Math.abs(gap) <= minStep ? gap : Math.sign(gap) * Math.max(Math.abs(gap) * ease, minStep);
+      this.cameraPos[axis] += step;
+    }
+    // Left unrounded: roundPixels snaps each sprite relative to the camera, which keeps the
+    // player steady on screen while the camera keeps pace with them.
+    cam.setScroll(this.cameraPos.x, this.cameraPos.y);
+  }
+
+  /** The scroll that would put the camera target in the middle of the screen, kept inside the level. */
+  private cameraScrollFor(axis: 'x' | 'y'): number {
+    const cam = this.cameras.main;
+    return axis === 'x'
+      ? cam.clampX(this.cameraTarget.x - cam.width / 2)
+      : cam.clampY(this.cameraTarget.y - cam.height / 2);
   }
 
   private updatePlayer(time: number): void {
