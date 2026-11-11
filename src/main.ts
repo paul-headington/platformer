@@ -16,9 +16,18 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  // Never step more than 1/30 s at once (e.g. after a hiccup), so fast bodies can't skip through a tile.
+  fps: { min: 30 },
   physics: {
     default: 'arcade',
-    arcade: { gravity: { x: 0, y: PLAYER.gravity }, debug: false },
+    arcade: {
+      gravity: { x: 0, y: PLAYER.gravity },
+      // Step physics once per rendered frame. With the default fixed 60 Hz step, a 120 Hz or
+      // 144 Hz screen moves the player only every other frame while the camera glides every
+      // frame, so the player shakes back and forth by a pixel as they move.
+      fixedStep: false,
+      debug: false,
+    },
   },
   scene: [BootScene, GameScene, HudScene],
 });
