@@ -29,7 +29,7 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('door', `door.png${v}`, { frameWidth: TILE, frameHeight: TILE * 2 });
     this.load.spritesheet('lurker', `lurker.png${v}`, { frameWidth: TILE * 2, frameHeight: TILE * 2 });
     this.load.spritesheet('tentacle', `tentacle.png${v}`, { frameWidth: TILE * 1.5, frameHeight: TILE * 2 });
-    this.load.image('spikes', `spikes.png${v}`);
+    this.load.spritesheet('snake', `snake.png${v}`, { frameWidth: TILE, frameHeight: 20 });
     this.load.image('sky', `sky.png${v}`);
   }
 
