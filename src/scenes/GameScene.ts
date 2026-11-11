@@ -1,17 +1,34 @@
 import Phaser from 'phaser';
-import { BULLET, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
+import { BULLET, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
 import { pad } from '../input/VirtualPad';
-import { LEVEL_1 } from '../levels/level1';
+import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
-// Tile indexes in the 'tiles' sheet (see BootScene).
-const BRICK = 0;
-const STONE = 1;
+// Tile indexes in the 'tiles' sheet (see TILE_SHEETS in tools/sprites.py).
+const WALL = 0;
+const SHELF = 1;
 const LADDER = 2;
 /** The top rung of a ladder, which can be stood on like a ledge. */
 const LADDER_TOP = 3;
 /** Stairs climbing up to the right ('/') and up to the left ('\'). */
 const STAIRS_UP_RIGHT = 4;
 const STAIRS_UP_LEFT = 5;
+const FLOORBOARDS = 6;
+const ROOF = 7;
+const FLAGSTONE = 8;
+const CRATE = 9;
+/** Tiles nothing can pass through, from any side. */
+const SOLID = new Set([WALL, FLOORBOARDS, ROOF, FLAGSTONE, CRATE]);
+
+/** Frames in the 'back' sheet: [plain wallpaper, wallpaper with dado rail, panelling] per zone. */
+const BACK: Record<BackStyle, [number, number, number]> = {
+  attic: [0, 0, 0],
+  upstairs: [1, 2, 3],
+  downstairs: [4, 5, 6],
+  cellar: [7, 7, 7],
+};
+const BACK_FLOOR_GAP = 8;
+/** Frames in the 'decor' sheet. */
+const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase: 8, vent: 10 } as const;
 /** Stairs can be stepped up or down this far in one frame. */
 const STEP_UP = 10;
 const STEP_DOWN = 8;
@@ -75,6 +92,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('Hud')) this.scene.launch('Hud');
 
     this.buildLevel(LEVEL_1);
+    this.addAtmosphere();
     this.setupInput();
     this.say(
       this.isTouch()
@@ -85,17 +103,33 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- level
 
-  private buildLevel(rows: string[]): void {
-    const data = rows.map((row, ty) => [...row].map((ch, tx) => GameScene.tileFor(ch, rows[ty - 1]?.[tx])));
-    const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const tileset = map.addTilesetImage('tiles')!;
-    this.layer = map.createLayer(0, tileset, 0, 0) as Phaser.Tilemaps.TilemapLayer;
-    // Stairs are marked as colliding only so the bricks beside them don't get a wall
-    // edge; tileCollides() lets bodies pass through them and stairSurface() does the rest.
-    this.layer.setCollision([BRICK, STONE, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
+  private buildLevel(level: Level): void {
+    // M marks the cupboard monster's corner; underneath it is ordinary wall.
+    const lurkers: [number, number][] = [];
+    level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'M' && lurkers.push([tx, ty])));
+    const rows = level.rows.map((row) => row.replaceAll('M', '#'));
+    const outside = GameScene.findSky(rows);
+    const zoneOf = (ty: number) => level.zones.filter((z) => z.fromRow <= ty).at(-1)?.style ?? 'downstairs';
+    const at = (tx: number, ty: number) => rows[ty]?.[tx] ?? '#';
 
-    const worldWidth = map.widthInPixels;
-    this.levelHeight = map.heightInPixels;
+    const data = rows.map((row, ty) =>
+      [...row].map((ch, tx) => {
+        if (ch !== '#') return GameScene.tileFor(ch, at(tx, ty - 1));
+        if (outside[ty - 1]?.[tx]) return ROOF;
+        const above = at(tx, ty - 1);
+        if (above === '#' || GameScene.isStairsChar(above)) return WALL;
+        return zoneOf(ty) === 'cellar' ? FLAGSTONE : FLOORBOARDS;
+      }),
+    );
+    this.layer = this.tileLayer(data, 'tiles', 0);
+    // Stairs are marked as colliding only so the walls beside them don't get an open
+    // edge; tileCollides() lets bodies pass through them and stairSurface() does the rest.
+    this.layer.setCollision([...SOLID, SHELF, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
+    this.buildBackdrop(rows, outside, zoneOf);
+    for (const [tx, ty] of lurkers) this.addLurker(tx * TILE, (ty + 1) * TILE);
+
+    const worldWidth = this.layer.width;
+    this.levelHeight = this.layer.height;
 
     const spikes = this.physics.add.staticGroup();
     const gems = this.physics.add.staticGroup();
@@ -113,6 +147,7 @@ export class GameScene extends Phaser.Scene {
         switch (ch) {
           case '^': {
             const s = spikes.create(cx, cy, 'spikes') as Phaser.Physics.Arcade.Image;
+            s.setDepth(1);
             (s.body as Phaser.Physics.Arcade.StaticBody).setSize(12, 6).setOffset(2, 10);
             break;
           }
@@ -132,6 +167,12 @@ export class GameScene extends Phaser.Scene {
           case 'D':
             this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setOrigin(0.5, 1).refreshBody();
             break;
+          case 'c': {
+            const glow = this.add.image(cx, cy - 4, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setDepth(-1);
+            this.tweens.add({ targets: glow, alpha: 0.7, scale: 0.92, duration: 140, yoyo: true, repeat: -1, delay: tx * 37, repeatDelay: 90 });
+            this.add.sprite(cx, cy, 'candle', 0).setDepth(-1).play({ key: 'candle-flicker', startFrame: tx % 3 });
+            break;
+          }
           case 'P':
             this.spawn.set(cx, bottom - 12);
             break;
@@ -168,7 +209,7 @@ export class GameScene extends Phaser.Scene {
       this.bullets,
       this.layer,
       (b) => (b as Sprite).destroy(),
-      (_b, t) => (t as Phaser.Tilemaps.Tile).index === BRICK,
+      (_b, t) => SOLID.has((t as Phaser.Tilemaps.Tile).index),
     );
 
     this.physics.add.overlap(this.player, spikes, () => this.hurt());
@@ -203,8 +244,8 @@ export class GameScene extends Phaser.Scene {
 
   private static tileFor(ch: string, above: string | undefined): number {
     switch (ch) {
-      case '#': return BRICK;
-      case '=': return STONE;
+      case 'X': return CRATE;
+      case '=': return SHELF;
       case 'H': return above === 'H' ? LADDER : LADDER_TOP;
       case '/': return STAIRS_UP_RIGHT;
       case '\\': return STAIRS_UP_LEFT;
@@ -212,17 +253,196 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private static isStairsChar(ch: string | undefined): boolean {
+    return ch === '/' || ch === '\\';
+  }
+
+  /** Marks the empty cells joined to the top edge of the map: that is the night sky. */
+  private static findSky(rows: string[]): boolean[][] {
+    const sky = rows.map((row) => [...row].map(() => false));
+    const open = (x: number, y: number) => y >= 0 && y < rows.length && x >= 0 && x < rows[y].length && !'#X/\\'.includes(rows[y][x]);
+    const todo: [number, number][] = [];
+    for (let x = 0; x < rows[0].length; x++) if (open(x, 0)) todo.push([x, 0]);
+    while (todo.length > 0) {
+      const [x, y] = todo.pop()!;
+      if (!open(x, y) || sky[y][x]) continue;
+      sky[y][x] = true;
+      todo.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    return sky;
+  }
+
+  private tileLayer(data: number[][], sheet: string, depth: number): Phaser.Tilemaps.TilemapLayer {
+    const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
+    const layer = map.createLayer(0, map.addTilesetImage(sheet)!, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+    return layer.setDepth(depth);
+  }
+
+  /**
+   * The wallpaper behind each room (with a dado rail and panelling just above
+   * each floor), the cut edge of broken floors, and the decorations.
+   */
+  private buildBackdrop(rows: string[], outside: boolean[][], zoneOf: (ty: number) => BackStyle): void {
+    const solidAt = (x: number, y: number) => rows[y]?.[x] === '#';
+    // A row that is mostly wall is a floor; gaps in it are holes in the floorboards.
+    const isFloorRow = rows.map((row) => [...row].filter((ch) => ch === '#').length > row.length * 0.7);
+    const back = rows.map((row, ty) =>
+      [...row].map((_ch, tx) => {
+        if (outside[ty][tx]) return -1;
+        if (isFloorRow[ty]) return BACK_FLOOR_GAP;
+        const [plain, rail, panel] = BACK[zoneOf(ty)];
+        if (solidAt(tx, ty + 1)) return panel;
+        if (solidAt(tx, ty + 2)) return rail;
+        return plain;
+      }),
+    );
+    this.tileLayer(back, 'back', -3);
+
+    const decor = rows.map((row, ty) =>
+      [...row].map((ch, tx) => {
+        switch (ch) {
+          case 'w':
+            return DECOR.window + (row[tx - 1] === 'w' ? 1 : 0) + (rows[ty - 1]?.[tx] === 'w' ? 2 : 0);
+          case '%':
+            return solidAt(tx + 1, ty) && !solidAt(tx - 1, ty) ? DECOR.cobwebRight : DECOR.cobwebLeft;
+          case 'f':
+            return DECOR.portrait + (tx % 2);
+          case 'b':
+            return DECOR.bookcase + (rows[ty - 1]?.[tx] === 'b' ? 1 : 0);
+          case 'v':
+            this.addTentacle(tx * TILE, ty * TILE);
+            return DECOR.vent;
+          default:
+            return -1;
+        }
+      }),
+    );
+    this.tileLayer(decor, 'decor', -2);
+
+    // Cold moonlight spilling in around each window (found by its top-left tile).
+    rows.forEach((row, ty) =>
+      [...row].forEach((ch, tx) => {
+        if (ch === 'w' && row[tx - 1] !== 'w' && rows[ty - 1]?.[tx] !== 'w') {
+          this.add.image((tx + 1) * TILE, (ty + 1) * TILE, 'glow-moon').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setDepth(-2);
+        }
+      }),
+    );
+  }
+
+  /**
+   * Scenery: every so often a tentacle slides down out of an air vent, sways about
+   * and pulls back in. It is drawn between the wallpaper and the vent's slats, so
+   * it really looks like it comes out of the duct. It hides if the player is close.
+   */
+  private addTentacle(left: number, top: number): void {
+    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setOrigin(0, 0).setDepth(-2.5);
+    const tooClose = () => Math.abs(this.player.x - left - 8) < TILE * 2 && Math.abs(this.player.y - top - 16) < TILE * 3;
+    const out = [1, 2, 3, 4, 3, 5, 4, 3, 5, 4, 3];
+    // Where the tip of the tentacle is in each frame, relative to the vent's top-left.
+    const TIP: [number, number][] = [[8, 0], [7, 16], [9, 22], [3, 29], [12, 30], [10, 29]];
+    let i = 0;
+    const drip = () => {
+      const frame = Number(tentacle.frame.name);
+      if (frame >= 2 && Math.random() < 0.7) {
+        const [dx, dy] = TIP[frame];
+        const drop = this.add.rectangle(left + dx, top + dy, 2, 3, 0xa6e86a).setDepth(-2.4);
+        this.tweens.add({
+          targets: drop,
+          y: top + dy + Phaser.Math.Between(40, 90),
+          alpha: 0,
+          scaleY: 2,
+          duration: 700,
+          ease: 'Quad.in',
+          onComplete: () => drop.destroy(),
+        });
+      }
+      this.time.delayedCall(Phaser.Math.Between(250, 600), drip);
+    };
+    this.time.delayedCall(500, drip);
+    const retract = (then: number) => {
+      tentacle.setFrame(1);
+      this.time.delayedCall(90, () => tentacle.setFrame(0));
+      this.time.delayedCall(then, reach);
+    };
+    const reach = () => {
+      i = 0;
+      const step = () => {
+        if (tooClose()) return retract(Phaser.Math.Between(2500, 4000));
+        if (i >= out.length) return retract(Phaser.Math.Between(4000, 9000));
+        tentacle.setFrame(out[i++]);
+        this.time.delayedCall(i <= 2 ? 160 : 320, step);
+      };
+      step();
+    };
+    this.time.delayedCall(Phaser.Math.Between(1000, 6000), reach);
+  }
+
+  /**
+   * Something lives in the cupboard under the stairs. It is only scenery: now and
+   * then its eyes open, follow the player, blink, and long fingers curl round the
+   * door. It hides if the player comes close.
+   */
+  private addLurker(left: number, bottom: number): void {
+    const FRAME = { dark: 0, eyes: 1, blink: 2, left: 3, right: 4, fingers: 5 };
+    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setOrigin(0, 1).setDepth(1);
+    const cx = left + 20;
+    const tooClose = () => Math.abs(this.player.x - cx) < TILE * 3 && Math.abs(this.player.y - bottom) < TILE * 3;
+    const look = () => (this.player.x < cx - TILE ? FRAME.left : this.player.x > cx + TILE ? FRAME.right : FRAME.eyes);
+
+    const steps: [number | (() => number), number][] = [];
+    const peek = () => {
+      steps.length = 0;
+      steps.push([FRAME.eyes, 400], [look, 1200], [FRAME.blink, 120], [look, 900]);
+      if (Math.random() < 0.6) steps.push([FRAME.fingers, 1400], [look, 500]);
+      steps.push([FRAME.blink, 120], [look, 700], [FRAME.blink, 150], [FRAME.dark, Phaser.Math.Between(3000, 7000)]);
+      next();
+    };
+    const next = () => {
+      const step = steps.shift();
+      if (!step) return peek();
+      if (tooClose() && step[0] !== FRAME.dark) {
+        lurker.setFrame(FRAME.dark); // shy: slam back into the dark
+        this.time.delayedCall(Phaser.Math.Between(3000, 5000), peek);
+        return;
+      }
+      lurker.setFrame(typeof step[0] === 'function' ? step[0]() : step[0]);
+      this.time.delayedCall(step[1], next);
+    };
+    this.time.delayedCall(Phaser.Math.Between(1500, 3000), peek);
+  }
+
+  /** The night sky behind the house, a dark vignette, and the odd flash of lightning. */
+  private addAtmosphere(): void {
+    this.add.image(0, 0, 'sky').setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
+    this.add.image(0, 0, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
+
+    const flash = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);
+    const strike = () => {
+      this.tweens.chain({
+        targets: flash,
+        tweens: [
+          { alpha: 0.22, duration: 60 },
+          { alpha: 0.04, duration: 90 },
+          { alpha: 0.16, duration: 50 },
+          { alpha: 0, duration: 500 },
+        ],
+      });
+      this.time.delayedCall(Phaser.Math.Between(9000, 17000), strike);
+    };
+    this.time.delayedCall(Phaser.Math.Between(4000, 8000), strike);
+  }
+
   private static isStairs(tile: Phaser.Tilemaps.Tile | null): boolean {
     return tile?.index === STAIRS_UP_RIGHT || tile?.index === STAIRS_UP_LEFT;
   }
 
   /**
-   * Bricks are solid. Stone ledges and ladder tops only block things landing on them
+   * Walls, floors and crates are solid. Shelves and ladder tops only block things landing on them
    * from above, and not a climbing player. Stairs never collide (see stairSurface).
    */
   private tileCollides(obj: unknown, tileObj: unknown): boolean {
     const tile = tileObj as Phaser.Tilemaps.Tile;
-    if (tile.index === BRICK) return true;
+    if (SOLID.has(tile.index)) return true;
     if (GameScene.isStairs(tile)) return false;
     if (obj === this.player && this.climbing) return false;
     const body = (obj as Sprite).body as Body;
