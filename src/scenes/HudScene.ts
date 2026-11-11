@@ -31,6 +31,12 @@ export class HudScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.registry.events.off('changedata', this.onChange, this));
     if (this.sys.game.device.input.touch) this.createTouchControls();
 
+    // Faint build version in the bottom-right corner, so it's easy to tell which build is running.
+    this.add
+      .text(GAME_WIDTH - 2, GAME_HEIGHT - 1, __VERSION__, { fontFamily: 'monospace', fontSize: '6px', color: '#ffffff' })
+      .setOrigin(1, 1)
+      .setAlpha(0.35);
+
     this.refresh();
     const msg = this.registry.get(REG.message) as HudMessage | undefined;
     if (msg) this.showMessage(msg);
