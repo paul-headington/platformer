@@ -46,8 +46,8 @@ npm run desktop:dist    # make an installer for the current OS into release/
 - `src/main.ts`: game config (320x200 resolution scaled up with crisp pixels, arcade physics).
 - `src/config.ts`: shared constants such as tile size and player speed.
 - `src/levels/level1.ts`: the level, drawn as text with one character per tile. Edit it to change the layout; the legend is at the top of the file.
-- `src/scenes/BootScene.ts`: loads the sprite sheets and sets up animations. Tiles, spikes and the door are still drawn in code as placeholders.
-- `tools/sprites.py`: the character and pickup sprites, drawn as text pixel maps. Edit a map, run `python3 tools/sprites.py --preview` (needs Pillow), and it rewrites `public/sprites/*.png` and `docs/sprite-preview.png`.
+- `src/scenes/BootScene.ts`: loads the sprite sheets (characters, house tiles, wallpaper, decorations, night sky) and sets up animations.
+- `tools/sprites.py`: all the art (characters, pickups, house tiles, wallpaper, decorations and the night sky), drawn as text pixel maps. Edit a map, run `python3 tools/sprites.py --preview` (needs Pillow), and it rewrites `public/sprites/*.png` and `docs/sprite-preview.png`.
 - `src/scenes/GameScene.ts`: builds the level and runs the player, enemies, pickups, lives and win/lose rules.
 - `src/scenes/HudScene.ts`: score, lives and item bar, on-screen messages, and the touch buttons.
 - `src/input/VirtualPad.ts`: touch button state, read by the game alongside the keyboard.
@@ -63,3 +63,4 @@ In dev mode (`npm run dev`) the game is available as `window.game` in the browse
 3. One playable level: enemies, weapon pickup, collectibles, death and respawn, exit door. Done.
 4. Package for web, desktop and mobile. Done: touch controls, installable web app, GitHub Pages deploy, Electron desktop app.
 5. Vertical levels: ladders, stairs and a camera that scrolls up and down. Level 1 is now three floors tall.
+6. Haunted house look: moonlit tiles, wallpaper, windows, candles and cobwebs, and level 1 rebuilt as a house with an attic, two storeys and a cellar.

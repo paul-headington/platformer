@@ -442,6 +442,519 @@ def build(frames, palette=PALETTE, size=None) -> Image.Image:
     return img
 
 
+# ================================================================ house tiles
+# The haunted house: a moonlit palette of cold violets and blues, with warm
+# wood and candlelight as the only bright spots. Tiles are 16x16. Several
+# tiles share one map drawn in different palettes (see TILE_SHEETS).
+
+STONE = """
+cccccccccacccccc
+bbbbbbbbdacbbbbb
+bbbbbbbbdacbbbbb
+bbbdbbbbdacbbbbb
+bbbbbbbbdacbbdbb
+bbbbbbbbdacbbbbb
+dddddddddadddddd
+aaaaaaaaaaaaaaaa
+cccacccccccccacc
+bbdacbbbbbbbdacb
+bbdacbbbbbbbdacb
+bbdacbbdbbbbdacb
+bbdacbbbbbbbdacb
+bbdacbbbbbbbdacb
+dddadddddddddadd
+aaaaaaaaaaaaaaaa
+"""
+
+# A wall stone with a mossy top edge, used for the cellar floor.
+FLAGSTONE = '\nmmmmMmmmmmmmMmmm' + STONE.strip('\n')[16:]
+
+FLOORBOARDS = """
+wwwwwwwwwwwwwwww
+WWWWWWWxWWWWWWWW
+WWWWWWWxWWWWWWWW
+WWWWWWWxWWWWWWWW
+xxxxxxxxxxxxxxxx
+qqqqqqqqqqqqqqqq
+qqqqqQqqqqqqqqqq
+qqqqqqqqqqqQqqqq
+qqqqqqqqqqqqqqqq
+qqQqqqqqqqqqqqqq
+qqqqqqqqqQqqqqqq
+qqqqqqqqqqqqqqqq
+qqqqqqQqqqqqqqqq
+qqqqqqqqqqqqqQqq
+QQQQQQQQQQQQQQQQ
+QQQQQQQQQQQQQQQQ
+"""
+
+SHINGLES = """
+yyyyyyyyyyyyyyyy
+rrrrrrrRrrrrrrrR
+rrrrrrrRrrrrrrrR
+RRRRRRRRRRRRRRRR
+yyyyyyyyyyyyyyyy
+rrrRrrrrrrrRrrrr
+rrrRrrrrrrrRrrrr
+RRRRRRRRRRRRRRRR
+yyyyyyyyyyyyyyyy
+rrrrrrrRrrrrrrrR
+rrrrrrrRrrrrrrrR
+RRRRRRRRRRRRRRRR
+yyyyyyyyyyyyyyyy
+rrrRrrrrrrrRrrrr
+rrrRrrrrrrrRrrrr
+RRRRRRRRRRRRRRRR
+"""
+
+# Stone ledge from before is now a wooden shelf on two brackets.
+SHELF = """
+wwwwwwwwwwwwwwww
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+xxxxxxxxxxxxxxxx
+.qqqQ......qqqQ.
+.qqQ.......qqQ..
+.qQ........qQ...
+.Q.........Q....
+................
+................
+................
+................
+................
+................
+................
+................
+"""
+
+LADDER = """
+..wq........wq..
+..wq........wq..
+..wq........wq..
+..wwwwwwwwwwwq..
+..wqxxxxxxxxwq..
+..wq........wq..
+..wq........wq..
+..wq........wq..
+..wq........wq..
+..wq........wq..
+..wq........wq..
+..wwwwwwwwwwwq..
+..wqxxxxxxxxwq..
+..wq........wq..
+..wq........wq..
+..wq........wq..
+"""
+
+# Each 4px step top must sit on the walking line in GameScene.stairSurface.
+STAIRS = """
+............wwww
+............WWWW
+............Qqqq
+............Qqqq
+........wwwwqqqq
+........WWWWqqqq
+........Qqqqqqqq
+........Qqqqqqqq
+....wwwwqqqqqqqq
+....WWWWqqqqqqqq
+....Qqqqqqqqqqqq
+....Qqqqqqqqqqqq
+wwwwqqqqqqqqqqqq
+WWWWqqqqqqqqqqqq
+qqqqqqqqqqqqqqqq
+QQQQQQQQQQQQQQQQ
+"""
+
+CRATE = """
+kkkkkkkkkkkkkkkk
+kwwwwwwwwwwwwwwk
+kwWWWWWWWWWWWWxk
+kwWxxxxxxxxxxWxk
+kwWxWWWWWWWxWWxk
+kwWxWWWWWWxWxWxk
+kwWxWWWWWxWWxWxk
+kwWxWWWWxWWWxWxk
+kwWxWWWxWWWWxWxk
+kwWxWWxWWWWWxWxk
+kwWxWxWWWWWWxWxk
+kwWxxWWWWWWWxWxk
+kwWxxxxxxxxxxWxk
+kwWWWWWWWWWWWWxk
+kxxxxxxxxxxxxxxk
+kkkkkkkkkkkkkkkk
+"""
+
+WALLPAPER = """
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuvvuuUUuuuuuu
+UUuvVVvuUUuuuuuu
+UUuuvvuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuvvuu
+UUuuuuuuUUuvVVvu
+UUuuuuuuUUuuvvuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+UUuuuuuuUUuuuuuu
+"""
+
+# Wallpaper with the wooden dado rail along its bottom edge.
+WALLPAPER_RAIL = '\n'.join(WALLPAPER.strip('\n').split('\n')[:13] + ['tttttttttttttttt', 'TTTTTTTTTTTTTTTT', 'kkkkkkkkkkkkkkkk'])
+
+WAINSCOT = """
+TTTTTTTTTTTTTTTT
+TtttttkTTtttttkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TtqqqqkTTtqqqqkT
+TkkkkkkTTkkkkkkT
+TTTTTTTTTTTTTTTT
+kkkkkkkkkkkkkkkk
+"""
+
+ATTIC_PLANKS = """
+pppoPPPopppoPPPo
+pppoPPPopppoPPPo
+pnpoPPPopppoPnPo
+pppoPPPopppoPPPo
+pppoPPPopopoPPPo
+pppoPPPoppooPPPo
+pppoPoPopppoPPPo
+pppoPPPopppoPPPo
+pppoPPPopppoPPPo
+ooooPPPopppooooo
+pppoPPPopppoPPPo
+pppoPPPopopoPPPo
+pppoPPPopppoPPPo
+pnpoPPPopppoPnPo
+pppoPPPopppoPPPo
+pppoPPPopppoPPPo
+"""
+
+# The broken edge of a floor seen in cross-section (holes, stairwells).
+FLOOR_GAP = """
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oPPPoooPPPoooPPP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPpPoooPpPoooPpP
+oPPPoooPPPoooPPP
+oooooooooooooooo
+oooooooooooooooo
+"""
+
+PORTRAIT_LADY = """
+................
+.YYYYYYYYYYYYYY.
+.YyyyyyyyyyyyyY.
+.Yy0000000000yY.
+.Yy0000hhh000yY.
+.Yy000hhhhh00yY.
+.Yy000hfffh00yY.
+.Yy000frfrf00yY.
+.Yy000fffff00yY.
+.Yy0000fff000yY.
+.Yy000ccccc00yY.
+.Yy00ccccccc0yY.
+.Yy0cccccccccyY.
+.YyyyyyyyyyyyyY.
+.YYYYYYYYYYYYYY.
+................
+"""
+
+PORTRAIT_MOON = """
+................
+.YYYYYYYYYYYYYY.
+.YyyyyyyyyyyyyY.
+.YynnnnnnnmmnyY.
+.YynnnnnnmmmmyY.
+.YynnnnnnnmmnyY.
+.YynnhnnnnnnnyY.
+.YynhhhnnnnnnyY.
+.YynnhnnnnnnnyY.
+.YynnhngggnnnyY.
+.YygghggggggnyY.
+.YyggggggggggyY.
+.YyggggggggggyY.
+.YyyyyyyyyyyyyY.
+.YYYYYYYYYYYYYY.
+................
+"""
+
+CANDLE_FLAMES = [
+    ['................', '........o.......', '.......oo.......', '.......oOo......', '.......OO.......'],
+    ['.......o........', '.......oo.......', '......oOo.......', '.......oOo......', '.......OO.......'],
+    ['................', '................', '........o.......', '.......oOo......', '.......OO.......'],
+]
+CANDLE_BASE = [
+    '.......ww.......', '.......wW.......', '.......wW.......', '.......wW.......', '.......wW.......',
+    '......YyyY......', '.....YyyyyY.....', '........Y.......', '........Y.......',
+    '.......yY.......', '......YyyY......',
+]
+CANDLE = ['\n'.join(flame + CANDLE_BASE) for flame in CANDLE_FLAMES]
+
+SPIKES = """
+................
+................
+................
+................
+................
+................
+................
+................
+.ll..ll..ll..ll.
+.lm..lm..lm..lm.
+.lm..lm..lm..lm.
+lmmMlmmMlmmMlmmM
+lmmMlmmMlmmMlmmM
+lmMMlmMMlmMMlmMM
+rrrrrrrrrrrrrrrr
+RRRRRRRRRRRRRRRR
+"""
+
+
+class Canvas:
+    """A small character grid for art that is easier to draw with code than by hand."""
+
+    def __init__(self, w, h, fill='.'):
+        self.w, self.h = w, h
+        self.g = [[fill] * w for _ in range(h)]
+
+    def px(self, x, y, ch):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            self.g[y][x] = ch
+
+    def rect(self, x, y, w, h, ch):
+        for yy in range(y, y + h):
+            for xx in range(x, x + w):
+                self.px(xx, yy, ch)
+
+    def line(self, x0, y0, x1, y1, ch):
+        n = max(abs(x1 - x0), abs(y1 - y0), 1)
+        for i in range(n + 1):
+            self.px(round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n), ch)
+
+    def crop(self, x, y, w, h):
+        return '\n'.join(''.join(row[x:x + w]) for row in self.g[y:y + h])
+
+
+def window_art():
+    """A 32x32 moonlit window with tattered curtains, cut into four tiles."""
+    c = Canvas(32, 32)
+    c.rect(5, 2, 22, 26, 'F')            # outer frame
+    c.rect(7, 4, 18, 22, 'n')            # night glass
+    c.rect(7, 15, 18, 11, 'N')           # lower panes catch a little light
+    for x, y in [(9, 6), (13, 9), (19, 12), (10, 18), (22, 20), (17, 6)]:
+        c.px(x, y, 's')
+    c.rect(19, 6, 4, 4, 'm')             # the moon in the top-right pane
+    c.rect(18, 7, 6, 2, 'm')
+    c.px(20, 7, 'M'), c.px(21, 9, 'M')
+    c.rect(15, 4, 2, 22, 'F'), c.rect(7, 14, 18, 2, 'F')   # glazing bars
+    c.rect(16, 4, 1, 22, 'f'), c.rect(7, 14, 18, 1, 'f')
+    c.rect(5, 2, 22, 1, 'f')
+    c.rect(3, 27, 26, 2, 'f'), c.rect(3, 29, 26, 1, 'F')   # sill
+    c.rect(0, 1, 32, 1, 'k')             # curtain rod
+    c.rect(0, 0, 2, 3, 'y'), c.rect(30, 0, 2, 3, 'y')
+    for side in (0, 1):                  # tattered curtains, longer in the middle of each fold
+        for i, length in enumerate([27, 30, 26, 22, 15, 9]):
+            x = i if side == 0 else 31 - i
+            c.rect(x, 2, 1, length, 'C' if i % 2 else 'c')
+    return [c.crop(0, 0, 16, 16), c.crop(16, 0, 16, 16), c.crop(0, 16, 16, 16), c.crop(16, 16, 16, 16)]
+
+
+def cobweb_art():
+    """Threads fanning out from a top-left corner, joined by sagging rings."""
+    c = Canvas(16, 16)
+    import math
+    angles = [0, 22, 45, 68, 90]
+    for a in angles:
+        r = math.radians(a)
+        c.line(0, 0, round(15 * math.cos(r)), round(15 * math.sin(r)), 'e')
+    for radius in (4, 8, 12):
+        pts = [(round(radius * math.cos(math.radians(a))), round(radius * math.sin(math.radians(a)))) for a in angles]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            c.line(x0, y0, x1, y1, 'E')
+    return c.crop(0, 0, 16, 16)
+
+
+def bookcase_art():
+    """A 16x32 bookcase full of dusty books, cut into top and bottom tiles."""
+    import random
+    rnd = random.Random(7)
+    c = Canvas(16, 32)
+    c.rect(0, 0, 16, 32, 'F')
+    c.rect(0, 0, 16, 2, 'f')
+    for top in (3, 11, 19):
+        c.rect(2, top, 12, 7, 'o')       # shadowy shelf back
+        x = 2
+        while x < 14:
+            h = rnd.choice([5, 6, 7])
+            book = rnd.choice('1234')
+            c.rect(x, top + 7 - h, 1 if rnd.random() < 0.3 else 2, h, book)
+            x += 2 if rnd.random() < 0.85 else 3
+        c.rect(1, top + 7, 14, 1, 'f')   # shelf
+    c.rect(2, 27, 12, 4, 'q')            # cupboard doors
+    c.rect(7, 27, 1, 4, 'F'), c.px(6, 29, 'y'), c.px(8, 29, 'y')
+    return [c.crop(0, 0, 16, 16), c.crop(0, 16, 16, 16)]
+
+
+def door_art(open_):
+    """The 16x32 exit door: an arched oak door with iron bands, or open onto warm light."""
+    c = Canvas(16, 32)
+    for y in range(32):
+        for x in range(16):
+            # Round the top into an arch.
+            if y < 8 and (x - 7.5) ** 2 + (y - 8) ** 2 > 8.2 ** 2:
+                continue
+            inner = y >= 2 and 2 <= x <= 13 and not (y < 8 and (x - 7.5) ** 2 + (y - 8) ** 2 > 6.2 ** 2)
+            if not inner:
+                c.px(x, y, 'a' if (x + y // 4) % 5 else 'd')    # stone arch
+            elif open_:
+                c.px(x, y, 'O' if y > 20 else 'o' if y > 10 else 'k')
+            else:
+                c.px(x, y, 'x' if x in (5, 8, 11) else 'W')
+    if open_:
+        c.rect(2, 8, 2, 24, 'x')         # the door swung back against the frame
+        c.rect(4, 26, 8, 6, 'O')
+    else:
+        c.rect(2, 10, 12, 1, 'm'), c.rect(2, 23, 12, 1, 'm')  # iron bands
+        c.px(11, 17, 'y'), c.px(11, 18, 'k'), c.px(10, 17, 'Y')  # lock
+    return c.crop(0, 0, 16, 32)
+
+
+def sky_art(w=448, h=248):
+    """The night sky behind the house: a violet gradient, stars and a big moon."""
+    import random
+    rnd = random.Random(3)
+    img = Image.new('RGBA', (w, h))
+    top, bottom = (10, 8, 28), (52, 34, 82)
+    for y in range(h):
+        t = y / (h - 1)
+        col = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom)) + (255,)
+        for x in range(w):
+            img.putpixel((x, y), col)
+    for _ in range(140):
+        x, y = rnd.randrange(w), rnd.randrange(h)
+        b = rnd.choice([120, 160, 210, 255])
+        img.putpixel((x, y), (b, b, min(255, b + 30), 255))
+    mx, my, r = 300, 30, 18
+    for y in range(my - r - 6, my + r + 7):
+        for x in range(mx - r - 6, mx + r + 7):
+            d = ((x - mx) ** 2 + (y - my) ** 2) ** 0.5
+            if d <= r:
+                shade = 228 - (12 if ((x - mx + 6) ** 2 + (y - my + 4) ** 2) < 25 or ((x - mx - 7) ** 2 + (y - my - 6) ** 2) < 16 else 0)
+                img.putpixel((x, y), (shade, shade, shade - 24, 255))
+            elif d <= r + 6:                 # soft halo
+                old = img.getpixel((x, y))
+                k = 0.25 * (1 - (d - r) / 6)
+                img.putpixel((x, y), tuple(round(o + (200 - o) * k) for o in old[:3]) + (255,))
+    for cy, cx, cw in [(48, 240, 90), (52, 330, 70), (120, 60, 120), (160, 260, 140)]:   # thin clouds
+        for x in range(cx, cx + cw):
+            for y in (cy, cy + 1):
+                if 0 <= x < w:
+                    old = img.getpixel((x, y))
+                    img.putpixel((x, y), tuple(round(o * 0.75 + 70 * 0.25) for o in old[:3]) + (255,))
+    return img
+
+
+# Moonlit palettes. Letters are reused between palettes on purpose: the same
+# map drawn in a different palette gives the cellar stone, the two wallpapers, etc.
+STONE_PAL = {'a': (34, 30, 50), 'b': (82, 76, 104), 'c': (112, 106, 136), 'd': (62, 56, 84)}
+CELLAR_STONE_PAL = {'a': (30, 32, 36), 'b': (60, 64, 70), 'c': (84, 90, 94), 'd': (46, 50, 56),
+                    'm': (70, 104, 70), 'M': (48, 76, 52)}
+CELLAR_BACK_PAL = {'a': (16, 16, 22), 'b': (32, 32, 42), 'c': (40, 40, 52), 'd': (26, 26, 34)}
+WOOD_PAL = {'w': (156, 108, 70), 'W': (120, 82, 54), 'x': (66, 42, 32), 'q': (72, 50, 44), 'Q': (48, 32, 32),
+            'k': (30, 20, 22)}
+ROOF_PAL = {'y': (100, 82, 122), 'r': (70, 56, 92), 'R': (44, 34, 62)}
+LADDER_PAL = {'w': (140, 100, 64), 'q': (96, 66, 42), 'x': (54, 36, 26)}
+MAUVE_PAL = {'U': (46, 32, 54), 'u': (54, 38, 62), 'v': (78, 56, 88), 'V': (66, 46, 76),
+             't': (104, 70, 54), 'T': (74, 50, 40), 'k': (30, 20, 22), 'q': (58, 38, 34)}
+TEAL_PAL = {**MAUVE_PAL, 'U': (26, 36, 50), 'u': (30, 42, 58), 'v': (46, 64, 84), 'V': (38, 54, 72)}
+ATTIC_PAL = {'p': (52, 42, 52), 'P': (44, 35, 45), 'o': (26, 20, 28), 'n': (96, 90, 104)}
+WINDOW_PAL = {'F': (66, 46, 40), 'f': (98, 70, 54), 'n': (20, 28, 64), 'N': (32, 44, 92), 's': (210, 220, 255),
+              'm': (230, 230, 206), 'M': (200, 200, 178), 'k': (24, 18, 22), 'y': (196, 150, 60),
+              'c': (98, 26, 46), 'C': (70, 18, 36)}
+DECOR_PAL = {**WINDOW_PAL, 'e': (196, 196, 216, 170), 'E': (170, 170, 196, 120),
+             'Y': (176, 128, 40), 'y': (224, 180, 80), '0': (24, 16, 28), 'h': (60, 56, 72),
+             'f': (206, 200, 186), 'r': (255, 64, 64), 'c': (84, 30, 56), 'g': (26, 36, 38),
+             'n': (24, 32, 70), 'm': (230, 230, 206),
+             'F': (64, 44, 36), 'o': (22, 16, 20), 'q': (84, 58, 42),
+             '1': (110, 40, 52), '2': (40, 72, 90), '3': (96, 86, 50), '4': (60, 46, 82)}
+BOOK_PAL = {**DECOR_PAL, 'f': (98, 70, 54), 'y': (196, 150, 60)}
+CANDLE_PAL = {'o': (255, 160, 48), 'O': (255, 240, 170), 'w': (232, 224, 200), 'W': (190, 180, 160),
+              'y': (214, 170, 80), 'Y': (150, 110, 40)}
+SPIKE_PAL = {'l': (206, 184, 168), 'm': (150, 96, 70), 'M': (96, 58, 46), 'r': (110, 70, 56), 'R': (70, 44, 38)}
+DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
+            'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
+
+WINDOW, BOOKCASE, COBWEB = window_art(), bookcase_art(), cobweb_art()
+
+# Each sheet is a list of (map, palette). Frame order matters: GameScene and
+# BootScene refer to frames by index (see the constants at the top of GameScene).
+TILE_SHEETS = {
+    # 0 stone wall, 1 shelf, 2 ladder, 3 ladder top, 4 stairs up-right, 5 stairs up-left,
+    # 6 floorboards, 7 roof, 8 cellar floor, 9 crate
+    'tiles': [(STONE, STONE_PAL), (SHELF, WOOD_PAL), (LADDER, LADDER_PAL), (LADDER, LADDER_PAL),
+              (STAIRS, WOOD_PAL), (mirror(STAIRS), WOOD_PAL), (FLOORBOARDS, WOOD_PAL), (SHINGLES, ROOF_PAL),
+              (FLAGSTONE, CELLAR_STONE_PAL), (CRATE, WOOD_PAL)],
+    # 0 attic planks, 1-3 upstairs wallpaper / rail / panelling, 4-6 downstairs, 7 cellar wall, 8 floor gap
+    'back': [(ATTIC_PLANKS, ATTIC_PAL), (WALLPAPER, MAUVE_PAL), (WALLPAPER_RAIL, MAUVE_PAL), (WAINSCOT, MAUVE_PAL),
+             (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
+             (FLOOR_GAP, ATTIC_PAL)],
+    # 0-3 window (top-left, top-right, bottom-left, bottom-right), 4-5 cobweb (left, right corner),
+    # 6-7 portraits, 8-9 bookcase (top, bottom)
+    'decor': [(w, WINDOW_PAL) for w in WINDOW] + [(COBWEB, DECOR_PAL), (mirror(COBWEB), DECOR_PAL),
+              (PORTRAIT_LADY, DECOR_PAL), (PORTRAIT_MOON, DECOR_PAL)] + [(b, BOOK_PAL) for b in BOOKCASE],
+    'candle': [(f, CANDLE_PAL) for f in CANDLE],
+    'spikes': [(SPIKES, SPIKE_PAL)],
+    'door': [(door_art(False), DOOR_PAL), (door_art(True), DOOR_PAL)],
+}
+
+
+def build_tiles(frames) -> Image.Image:
+    """Like build(), but each frame has its own palette, and colours may carry an alpha."""
+    imgs = []
+    for art, pal in frames:
+        grid = parse(art)
+        h, w = len(grid), len(grid[0])
+        img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        for y, row in enumerate(grid):
+            for x, ch in enumerate(row):
+                if ch != '.':
+                    col = pal[ch]
+                    img.putpixel((x, y), col if len(col) == 4 else col + (255,))
+        imgs.append(img)
+    w, h = imgs[0].size
+    for i, im in enumerate(imgs):
+        assert im.size == (w, h), f'frame {i} is {im.size}, not {(w, h)}'
+    sheet = Image.new('RGBA', (w * len(imgs), h), (0, 0, 0, 0))
+    for i, im in enumerate(imgs):
+        sheet.alpha_composite(im, (i * w, 0))
+    return sheet
+
+
 SHEETS = {
     'player': PLAYER, 'zombie': ZOMBIE, 'ghost': GHOST,
     'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
@@ -465,10 +978,12 @@ if __name__ == '__main__':
     out_dir = root / 'public' / 'sprites'
     out_dir.mkdir(parents=True, exist_ok=True)
     built = {name: build(frames, size=CHAR_SIZE.get(name)) for name, frames in SHEETS.items()}
+    built.update({name: build_tiles(frames) for name, frames in TILE_SHEETS.items()})
+    built['sky'] = sky_art()
     for name, im in built.items():
         im.save(out_dir / f'{name}.png')
         print(f'{name}.png  {im.width}x{im.height}')
     if '--preview' in sys.argv:
         (root / 'docs').mkdir(exist_ok=True)
-        preview(built).save(root / 'docs' / 'sprite-preview.png')
+        preview({k: v for k, v in built.items() if k != 'sky'}).save(root / 'docs' / 'sprite-preview.png')
         print('docs/sprite-preview.png')
