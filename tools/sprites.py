@@ -264,12 +264,37 @@ def zombie_pose(dy, body, legs):
     return [(trousers(legs), 3, 17), (body, 3, 10 + dy), (ZOMBIE_HEAD, 5, 1 + dy)]
 
 
-# Frames 0-3: lurching walk.
+# The back of a zombie's head: patchy hair over green skin.
+ZOMBIE_HEAD_BACK = """
+....kkkkk...
+..kknnnGnkk.
+.knnGgnnnGnk
+.kngggnGggnk
+kGgggggnggGk
+.kGgggggggk.
+.kGgggggGgk.
+.kGGgggggGk.
+..kGGgggGk..
+...kGGGGk...
+"""
+
+
+def zombie_climb_pose(flip):
+    body = BODY_CLIMB.replace('j', 'c').replace('J', 'C').replace('s', 'g')
+    legs = trousers(LEGS_CLIMB)
+    if flip:
+        body, legs = mirror(body), mirror(legs)
+    return [(legs, 3, 17), (body, 3, 10), (ZOMBIE_HEAD_BACK, 4, 0)]
+
+
+# Frames 0-3: lurching walk. 4-5: climbing a ladder, seen from behind.
 ZOMBIE = [
     zombie_pose(1, ZOMBIE_BODY_A, LEGS_STRIDE),
     zombie_pose(0, ZOMBIE_BODY_B, LEGS_PASS),
     zombie_pose(1, ZOMBIE_BODY_A, LEGS_STRIDE),
     zombie_pose(0, ZOMBIE_BODY_B, LEGS_STAND),
+    zombie_climb_pose(False),
+    zombie_climb_pose(True),
 ]
 
 GHOST_TOP = """
@@ -406,6 +431,27 @@ BULLET = ["""
 .kkkk.
 kyoook
 .kkkk.
+"""]
+
+# Pops up over a zombie's head: 0 "!" when it spots the player, 1 "?" when it loses them.
+EMOTE = ["""
+..kkk..
+..kyk..
+..kyk..
+..kyk..
+..kyk..
+..kkk..
+..kyk..
+..kkk..
+""", """
+.kkkkk.
+kkwwwkk
+kwkkkwk
+kkk.kwk
+..kwwkk
+..kkkk.
+..kwk..
+..kkk..
 """]
 
 
@@ -1045,7 +1091,7 @@ def build_tiles(frames) -> Image.Image:
 
 SHEETS = {
     'player': PLAYER, 'zombie': ZOMBIE, 'ghost': GHOST,
-    'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
+    'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET, 'emote': EMOTE,
 }
 
 

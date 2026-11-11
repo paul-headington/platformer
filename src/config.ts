@@ -17,7 +17,24 @@ export const PLAYER = {
 };
 
 export const BULLET = { speed: 320, cooldown: 280, maxOnScreen: 3 };
-export const ZOMBIE = { speed: 32 };
+export const ZOMBIE = {
+  /** Wandering speed. */
+  speed: 32,
+  /** Chasing speed: quicker than wandering, still well under PLAYER.runSpeed so the player can get away. */
+  chaseSpeed: 52,
+  climbSpeed: 36,
+  /** How far ahead it can see along its own floor, and how close it hears the player from any side (px). */
+  sight: 8 * TILE,
+  hearing: 36,
+  /** The "!" pause after spotting the player, before it gives chase (ms). */
+  alertTime: 500,
+  /** Gives up after losing track of the player for this long (ms). */
+  forgetAfter: 3500,
+  /** While the player is this few steps away on the walking map, it keeps track of them unseen. */
+  trackSteps: 10,
+  /** Re-plans its route at least this often (ms). */
+  replanEvery: 300,
+};
 export const GHOST = { speed: 28, range: 48, bob: 6 };
 
 export const SCORE = { gem: 100, enemy: 200, key: 500, exit: 1000 };

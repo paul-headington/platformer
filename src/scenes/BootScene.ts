@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('key', `key.png${v}`);
     this.load.image('gun', `gun.png${v}`);
     this.load.image('bullet', `bullet.png${v}`);
+    this.load.spritesheet('emote', `emote.png${v}`, { frameWidth: 7, frameHeight: 8 });
     for (const sheet of ['tiles', 'back', 'decor', 'candle']) {
       this.load.spritesheet(sheet, `${sheet}.png${v}`, { frameWidth: TILE, frameHeight: TILE });
     }
@@ -47,6 +48,7 @@ export class BootScene extends Phaser.Scene {
     this.anims.create({ key: 'player-climb', frames: frames('player', [8, 9]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'player-run', frames: frames('player', [2, 3, 4, 5]), frameRate: 10, repeat: -1 });
     this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
+    this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
     this.anims.create({ key: 'gem-sparkle', frames: frames('gem', [0, 1, 2, 3]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'candle-flicker', frames: frames('candle', [0, 1, 0, 2, 1, 2]), frameRate: 8, repeat: -1 });

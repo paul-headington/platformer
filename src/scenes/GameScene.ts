@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { BULLET, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
+import { NavGrid } from '../ai/NavGrid';
+import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
+import { BULLET, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -53,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   private bullets!: Phaser.Physics.Arcade.Group;
   private spawn = new Phaser.Math.Vector2();
   private levelHeight = 0;
+  private nav!: NavGrid;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyLeft: Phaser.Input.Keyboard.Key[] = [];
@@ -111,6 +114,7 @@ export class GameScene extends Phaser.Scene {
     const outside = GameScene.findSky(rows);
     const zoneOf = (ty: number) => level.zones.filter((z) => z.fromRow <= ty).at(-1)?.style ?? 'downstairs';
     const at = (tx: number, ty: number) => rows[ty]?.[tx] ?? '#';
+    this.nav = new NavGrid(rows);
 
     const data = rows.map((row, ty) =>
       [...row].map((ch, tx) => {
@@ -179,7 +183,7 @@ export class GameScene extends Phaser.Scene {
           case 'z': {
             const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
             (z.body as Body).setSize(8, 21).setOffset(6, 3);
-            z.setData('dir', -1).play('zombie-walk');
+            z.play('zombie-walk');
             break;
           }
           case 'g': {
@@ -195,6 +199,15 @@ export class GameScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0);
     (this.player.body as Body).setSize(8, 22).setOffset(6, 2);
     this.player.setCollideWorldBounds(true).setDepth(10);
+
+    const world: ZombieWorld = {
+      nav: this.nav,
+      player: this.player,
+      playerIsFair: () => this.state === 'playing' && this.time.now >= this.invulnerableUntil,
+      playerIsClimbing: () => this.climbing,
+      stairSurface: (body, maxDrop) => this.stairSurface(body, maxDrop),
+    };
+    for (const z of this.zombies.getChildren() as Sprite[]) z.setData('brain', new ZombieBrain(z, world));
 
     // Open bottom edge so falling into a pit is possible.
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
@@ -445,6 +458,7 @@ export class GameScene extends Phaser.Scene {
     if (SOLID.has(tile.index)) return true;
     if (GameScene.isStairs(tile)) return false;
     if (obj === this.player && this.climbing) return false;
+    if ((obj as Sprite).getData?.('brain')?.climbing) return false;
     const body = (obj as Sprite).body as Body;
     return body.velocity.y >= 0 && body.prev.y + body.height <= tile.pixelY + 2;
   }
@@ -674,18 +688,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateEnemies(time: number): void {
-    for (const z of this.zombies.getChildren() as Sprite[]) {
-      const body = z.body as Body;
-      let dir = z.getData('dir') as number;
-      const ahead = z.x + dir * 7;
-      const tile = this.layer.getTileAtWorldXY(ahead, body.bottom + 2);
-      const floorAhead = tile?.collides && !GameScene.isStairs(tile);
-      if ((dir < 0 && body.blocked.left) || (dir > 0 && body.blocked.right) || (body.blocked.down && !floorAhead)) {
-        dir = -dir;
-        z.setData('dir', dir);
-      }
-      z.setVelocityX(dir * ZOMBIE.speed).setFlipX(dir < 0);
-    }
+    for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).update(time);
 
     for (const g of this.ghosts.getChildren() as Sprite[]) {
       const t = time / 1000 + (g.getData('phase') as number);
@@ -721,6 +724,7 @@ export class GameScene extends Phaser.Scene {
     body.checkCollision.none = false;
     this.player.clearTint().setPosition(this.spawn.x, this.spawn.y).setVelocity(0, 0);
     this.invulnerableUntil = this.time.now + PLAYER.invulnerableAfterRespawn;
+    for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).forget();
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 100, yoyo: true, repeat: 6, onComplete: () => this.player.setAlpha(1) });
     pad.clearPresses();
     this.state = 'playing';
