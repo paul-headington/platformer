@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BULLET, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
+import { pad } from '../input/VirtualPad';
 import { LEVEL_1 } from '../levels/level1';
 
 const BRICK = 0;
@@ -46,6 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.state = 'playing';
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
     this.invulnerableUntil = 0;
+    pad.reset();
 
     this.registry.set(REG.score, 0);
     this.registry.set(REG.lives, PLAYER.startLives);
@@ -55,7 +57,7 @@ export class GameScene extends Phaser.Scene {
 
     this.buildLevel(LEVEL_1);
     this.setupInput();
-    this.say('Find the key and reach the door!\nArrows: move   Space: jump');
+    this.say(this.isTouch() ? 'Find the key and reach the door!' : 'Find the key and reach the door!\nArrows: move   Space: jump');
   }
 
   // ---------------------------------------------------------------- level
@@ -154,7 +156,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.player, gun, () => {
         gun!.destroy();
         this.registry.set(REG.hasGun, true);
-        this.say('You found a gun!\nPress X to shoot');
+        this.say(`You found a gun!\n${this.isTouch() ? 'Tap FIRE' : 'Press X'} to shoot`);
       });
     }
     if (key) {
@@ -214,7 +216,8 @@ export class GameScene extends Phaser.Scene {
     this.cullBullets();
 
     if (this.state === 'won' || this.state === 'over') {
-      if (Phaser.Input.Keyboard.JustDown(this.keyRestart)) this.scene.restart();
+      const restart = Phaser.Input.Keyboard.JustDown(this.keyRestart);
+      if (pad.justDown('start') || restart) this.scene.restart();
       return;
     }
     if (this.state !== 'playing') return;
@@ -230,20 +233,22 @@ export class GameScene extends Phaser.Scene {
     const onGround = body.blocked.down || body.touching.down;
     if (onGround) this.lastGroundedAt = time;
 
-    const left = GameScene.anyDown(this.keyLeft);
-    const right = GameScene.anyDown(this.keyRight);
+    const left = GameScene.anyDown(this.keyLeft) || pad.isDown('left');
+    const right = GameScene.anyDown(this.keyRight) || pad.isDown('right');
     if (left && !right) p.setVelocityX(-PLAYER.runSpeed).setFlipX(true);
     else if (right && !left) p.setVelocityX(PLAYER.runSpeed).setFlipX(false);
     else p.setVelocityX(0);
 
-    if (GameScene.anyJustDown(this.keyJump)) this.jumpPressedAt = time;
+    const jumpKey = GameScene.anyJustDown(this.keyJump);
+    if (pad.justDown('jump') || jumpKey) this.jumpPressedAt = time;
     const canJump = time - this.lastGroundedAt <= PLAYER.coyoteTime;
     if (time - this.jumpPressedAt <= PLAYER.jumpBuffer && canJump) {
       p.setVelocityY(-PLAYER.jumpVelocity);
       this.jumpPressedAt = this.lastGroundedAt = -Infinity;
     }
     // Letting go of jump early gives a shorter hop.
-    if (GameScene.anyJustUp(this.keyJump) && body.velocity.y < 0) body.velocity.y *= 0.45;
+    const jumpReleased = GameScene.anyJustUp(this.keyJump);
+    if ((pad.justUp('jump') || jumpReleased) && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     if (!onGround) {
       p.anims.stop();
@@ -255,7 +260,8 @@ export class GameScene extends Phaser.Scene {
       p.setFrame(0);
     }
 
-    if (GameScene.anyJustDown(this.keyFire)) this.shoot(time);
+    const fireKey = GameScene.anyJustDown(this.keyFire);
+    if (pad.justDown('fire') || fireKey) this.shoot(time);
   }
 
   private shoot(time: number): void {
@@ -321,13 +327,15 @@ export class GameScene extends Phaser.Scene {
     this.player.clearTint().setPosition(this.spawn.x, this.spawn.y).setVelocity(0, 0);
     this.invulnerableUntil = this.time.now + PLAYER.invulnerableAfterRespawn;
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 100, yoyo: true, repeat: 6, onComplete: () => this.player.setAlpha(1) });
+    pad.clearPresses();
     this.state = 'playing';
   }
 
   private gameOver(): void {
     this.state = 'over';
+    pad.clearPresses();
     this.player.setVisible(false);
-    this.say('GAME OVER\nPress Enter to try again', true);
+    this.say(`GAME OVER\n${this.isTouch() ? 'Tap' : 'Press Enter'} to try again`, true);
   }
 
   private reachDoor(): void {
@@ -338,9 +346,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.state = 'won';
+    pad.clearPresses();
     this.addScore(SCORE.exit);
     this.player.setVelocity(0, 0).setVisible(false);
-    this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\nPress Enter to play again`, true);
+    this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\n${this.isTouch() ? 'Tap' : 'Press Enter'} to play again`, true);
   }
 
   private killEnemy(enemy: Sprite): void {
@@ -349,6 +358,10 @@ export class GameScene extends Phaser.Scene {
     const puff = this.add.image(enemy.x, enemy.y, enemy.texture.key, 0).setFlipX(enemy.flipX);
     enemy.destroy();
     this.tweens.add({ targets: puff, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => puff.destroy() });
+  }
+
+  private isTouch(): boolean {
+    return this.sys.game.device.input.touch;
   }
 
   private addScore(n: number): void {
