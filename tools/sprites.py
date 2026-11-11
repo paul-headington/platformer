@@ -161,12 +161,55 @@ LEGS_DANGLE = """
 ..kkkk..kkkkk.
 """
 
+HEAD_BACK = """
+....kkkkk...
+..kkhhhiikk.
+.khhhhhhhihk
+.khhhhhhhhhk
+kHHHHHHHHHHk
+.knnnnnnnnk.
+.knnnnnnnnk.
+.knnnnnnnnk.
+..knnnnnnk..
+...kSSSSk...
+"""
+
+# Climbing, seen from behind: one hand reaches up while the other grips.
+BODY_CLIMB = """
+.ks.kkkkkk....
+.kjkjjjjjjkk..
+..kJjjjjjjjsk.
+..kJjjjjjjjkk.
+..kJjjjjjjjk..
+..kJjjjjjjjk..
+...kkkkkkkk...
+"""
+
+LEGS_CLIMB = """
+...kppppppk...
+...kpPkkpPk...
+...kpPkkpPk...
+...kbbbkpPk...
+...kkkk.kpPk..
+........kbbbk.
+........kkkkk.
+"""
+
+
+def mirror(part):
+    return '\n'.join(row[::-1] for row in part.strip('\n').split('\n'))
+
+
+def climb_pose(flip):
+    body, legs = (mirror(BODY_CLIMB), mirror(LEGS_CLIMB)) if flip else (BODY_CLIMB, LEGS_CLIMB)
+    return [(legs, 3, 17), (body, 3, 10), (HEAD_BACK, 4, 0)]
+
 
 def pose(head_dy, body, legs, legs_dy=0):
     return [(legs, 3, 17 + legs_dy), (body, 3, 10 + head_dy), (HEAD, 5, head_dy)]
 
 
-# Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt.
+# Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb.
 PLAYER = [
     pose(0, BODY_IDLE, LEGS_STAND),
     pose(1, BODY_IDLE, LEGS_STAND),
@@ -176,6 +219,8 @@ PLAYER = [
     pose(0, BODY_IDLE, LEGS_PASS),
     pose(0, BODY_JUMP, LEGS_TUCK),
     pose(0, BODY_ARMS_UP, LEGS_DANGLE),
+    climb_pose(False),
+    climb_pose(True),
 ]
 
 ZOMBIE_HEAD = """

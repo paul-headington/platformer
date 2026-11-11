@@ -25,9 +25,25 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Tileset: frame 0 = brick, frame 1 = stone ledge.
-    this.sheet('tiles', TILE, TILE, 2, (g, ox, f) => {
-      if (f === 0) {
+    // Tileset: 0 brick, 1 stone ledge, 2 ladder, 3 ladder top (same look), 4 stairs up-right, 5 stairs up-left.
+    this.sheet('tiles', TILE, TILE, 6, (g, ox, f) => {
+      if (f === 2 || f === 3) {
+        g.fillStyle(0x6b4a2b).fillRect(ox + 2, 0, 2, TILE).fillRect(ox + 12, 0, 2, TILE);
+        g.fillStyle(0x9c7444).fillRect(ox + 2, 0, 1, TILE).fillRect(ox + 12, 0, 1, TILE);
+        for (const y of [3, 11]) {
+          g.fillStyle(0x9c7444).fillRect(ox + 4, y, 8, 2);
+          g.fillStyle(0x4a321d).fillRect(ox + 4, y + 2, 8, 1);
+        }
+      } else if (f === 4 || f === 5) {
+        // Four 4px steps; each step top sits on the walking line used in GameScene.stairSurface.
+        for (let i = 0; i < 4; i++) {
+          const x = ox + (f === 4 ? i * 4 : 12 - i * 4);
+          const top = 12 - i * 4;
+          g.fillStyle(0x4d3524).fillRect(x, top, 4, TILE - top);
+          g.fillStyle(0xa0703f).fillRect(x, top, 4, 2);
+          g.fillStyle(0xc89458).fillRect(x, top, 4, 1);
+        }
+      } else if (f === 0) {
         g.fillStyle(0x7a3b2e).fillRect(ox, 0, TILE, TILE);
         g.fillStyle(0x5a2a20);
         g.fillRect(ox, 7, TILE, 1).fillRect(ox, 15, TILE, 1);
@@ -58,6 +74,7 @@ export class BootScene extends Phaser.Scene {
     });
     const frames = (key: string, list: number[]) => this.anims.generateFrameNumbers(key, { frames: list });
     this.anims.create({ key: 'player-idle', frames: frames('player', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
+    this.anims.create({ key: 'player-climb', frames: frames('player', [8, 9]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'player-run', frames: frames('player', [2, 3, 4, 5]), frameRate: 10, repeat: -1 });
     this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
