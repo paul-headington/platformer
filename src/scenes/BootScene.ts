@@ -15,9 +15,9 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     this.load.setPath('sprites/');
     // Frame layouts are documented in tools/sprites.py.
-    this.load.spritesheet('player', 'player.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('zombie', 'zombie.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('ghost', 'ghost.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('player', 'player.png', { frameWidth: 20, frameHeight: 24 });
+    this.load.spritesheet('zombie', 'zombie.png', { frameWidth: 20, frameHeight: 24 });
+    this.load.spritesheet('ghost', 'ghost.png', { frameWidth: 20, frameHeight: 20 });
     this.load.spritesheet('gem', 'gem.png', { frameWidth: 8, frameHeight: 8 });
     this.load.image('key', 'key.png');
     this.load.image('gun', 'gun.png');

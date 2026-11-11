@@ -110,17 +110,17 @@ export class GameScene extends Phaser.Scene {
             this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setOrigin(0.5, 1).refreshBody();
             break;
           case 'P':
-            this.spawn.set(cx, bottom - 8);
+            this.spawn.set(cx, bottom - 12);
             break;
           case 'z': {
-            const z = this.zombies.create(cx, bottom - 8, 'zombie', 0) as Sprite;
-            (z.body as Body).setSize(9, 15).setOffset(3, 1);
+            const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
+            (z.body as Body).setSize(8, 21).setOffset(6, 3);
             z.setData('dir', -1).play('zombie-walk');
             break;
           }
           case 'g': {
             const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
-            (gh.body as Body).setSize(10, 10).setOffset(3, 3);
+            (gh.body as Body).setSize(12, 12).setOffset(4, 3);
             gh.setData({ ox: cx, oy: cy, phase: tx }).setAlpha(0.85).play('ghost-float');
             break;
           }
@@ -129,7 +129,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0);
-    (this.player.body as Body).setSize(8, 15).setOffset(4, 1);
+    (this.player.body as Body).setSize(8, 22).setOffset(6, 2);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     // Open bottom edge so falling into a pit is possible.
@@ -272,7 +272,7 @@ export class GameScene extends Phaser.Scene {
     if (this.bullets.countActive() >= BULLET.maxOnScreen) return;
     this.lastShotAt = time;
     const dir = this.player.flipX ? -1 : 1;
-    const b = this.bullets.create(this.player.x + dir * 8, this.player.y + 1, 'bullet') as Sprite;
+    const b = this.bullets.create(this.player.x + dir * 10, this.player.y + 1, 'bullet') as Sprite;
     b.setVelocityX(dir * BULLET.speed);
   }
 
