@@ -104,7 +104,10 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- level
 
   private buildLevel(level: Level): void {
-    const rows = level.rows;
+    // M marks the cupboard monster's corner; underneath it is ordinary wall.
+    const lurkers: [number, number][] = [];
+    level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'M' && lurkers.push([tx, ty])));
+    const rows = level.rows.map((row) => row.replaceAll('M', '#'));
     const outside = GameScene.findSky(rows);
     const zoneOf = (ty: number) => level.zones.filter((z) => z.fromRow <= ty).at(-1)?.style ?? 'downstairs';
     const at = (tx: number, ty: number) => rows[ty]?.[tx] ?? '#';
@@ -123,6 +126,7 @@ export class GameScene extends Phaser.Scene {
     // edge; tileCollides() lets bodies pass through them and stairSurface() does the rest.
     this.layer.setCollision([...SOLID, SHELF, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
     this.buildBackdrop(rows, outside, zoneOf);
+    for (const [tx, ty] of lurkers) this.addLurker(tx * TILE, (ty + 1) * TILE);
 
     const worldWidth = this.layer.width;
     this.levelHeight = this.layer.height;
@@ -320,6 +324,40 @@ export class GameScene extends Phaser.Scene {
         }
       }),
     );
+  }
+
+  /**
+   * Something lives in the cupboard under the stairs. It is only scenery: now and
+   * then its eyes open, follow the player, blink, and long fingers curl round the
+   * door. It hides if the player comes close.
+   */
+  private addLurker(left: number, bottom: number): void {
+    const FRAME = { dark: 0, eyes: 1, blink: 2, left: 3, right: 4, fingers: 5 };
+    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setOrigin(0, 1).setDepth(1);
+    const cx = left + 20;
+    const tooClose = () => Math.abs(this.player.x - cx) < TILE * 3 && Math.abs(this.player.y - bottom) < TILE * 3;
+    const look = () => (this.player.x < cx - TILE ? FRAME.left : this.player.x > cx + TILE ? FRAME.right : FRAME.eyes);
+
+    const steps: [number | (() => number), number][] = [];
+    const peek = () => {
+      steps.length = 0;
+      steps.push([FRAME.eyes, 400], [look, 1200], [FRAME.blink, 120], [look, 900]);
+      if (Math.random() < 0.6) steps.push([FRAME.fingers, 1400], [look, 500]);
+      steps.push([FRAME.blink, 120], [look, 700], [FRAME.blink, 150], [FRAME.dark, Phaser.Math.Between(3000, 7000)]);
+      next();
+    };
+    const next = () => {
+      const step = steps.shift();
+      if (!step) return peek();
+      if (tooClose() && step[0] !== FRAME.dark) {
+        lurker.setFrame(FRAME.dark); // shy: slam back into the dark
+        this.time.delayedCall(Phaser.Math.Between(3000, 5000), peek);
+        return;
+      }
+      lurker.setFrame(typeof step[0] === 'function' ? step[0]() : step[0]);
+      this.time.delayedCall(step[1], next);
+    };
+    this.time.delayedCall(Phaser.Math.Between(1500, 3000), peek);
   }
 
   /** The night sky behind the house, a dark vignette, and the odd flash of lightning. */

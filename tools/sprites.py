@@ -820,6 +820,37 @@ def bookcase_art():
     return [c.crop(0, 0, 16, 16), c.crop(0, 16, 16, 16)]
 
 
+def lurker_art(eyes, look=0, fingers=False):
+    """
+    A 32x32 cupboard under the stairs, its door ajar, with something inside.
+    eyes: None (just darkness), 'open' or 'half'; look: pupils -1 left, 0 ahead, 1 right;
+    fingers: long grey fingers curled round the edge of the door.
+    """
+    c = Canvas(32, 32)
+    c.rect(3, 5, 26, 27, 'F')            # wooden frame
+    c.rect(3, 5, 26, 1, 'f')
+    c.rect(5, 7, 22, 25, 'k')            # the dark inside
+    c.rect(18, 9, 9, 23, 'K')
+    c.rect(5, 7, 10, 25, 'W')            # door, swung half open
+    for x in (7, 10, 13):
+        c.rect(x, 9, 1, 21, 'x')
+    c.rect(5, 7, 10, 1, 'w')
+    c.rect(14, 7, 1, 25, 'x')
+    c.px(13, 19, 'y')                    # door knob
+    if eyes:
+        for ex in (18, 23):
+            if eyes == 'open':
+                c.rect(ex, 15, 4, 2, 'e'), c.rect(ex + 1, 14, 2, 1, 'e'), c.rect(ex + 1, 17, 2, 1, 'E')
+                c.rect(ex + 1 + look, 15, 2, 2, 'p')
+            else:
+                c.rect(ex, 16, 4, 1, 'E')
+    if fingers:
+        for i, y in enumerate((17, 20, 23)):
+            c.rect(15, y, 3, 1, 'g'), c.px(15, y + 1, 'G'), c.px(14, y + 1, 'c')
+            c.rect(16, y + 1, 2 + i % 2, 1, 'G')
+    return c.crop(0, 0, 32, 32)
+
+
 def door_art(open_):
     """The 16x32 exit door: an arched oak door with iron bands, or open onto warm light."""
     c = Canvas(16, 32)
@@ -909,6 +940,10 @@ SPIKE_PAL = {'l': (206, 184, 168), 'm': (150, 96, 70), 'M': (96, 58, 46), 'r': (
 DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
             'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
 
+LURKER_PAL = {'F': (60, 42, 36), 'f': (86, 60, 46), 'k': (6, 4, 10), 'K': (12, 9, 18), 'W': (84, 56, 40),
+              'w': (110, 76, 52), 'x': (52, 34, 26), 'y': (196, 150, 60), 'e': (226, 246, 110),
+              'E': (150, 170, 60), 'p': (40, 8, 8), 'g': (150, 148, 136), 'G': (100, 98, 92), 'c': (226, 224, 206)}
+
 WINDOW, BOOKCASE, COBWEB = window_art(), bookcase_art(), cobweb_art()
 
 # Each sheet is a list of (map, palette). Frame order matters: GameScene and
@@ -930,6 +965,10 @@ TILE_SHEETS = {
     'candle': [(f, CANDLE_PAL) for f in CANDLE],
     'spikes': [(SPIKES, SPIKE_PAL)],
     'door': [(door_art(False), DOOR_PAL), (door_art(True), DOOR_PAL)],
+    # The thing under the stairs: 0 dark, 1 eyes, 2 blink, 3 looking left, 4 looking right, 5 fingers out
+    'lurker': [(lurker_art(None), LURKER_PAL), (lurker_art('open'), LURKER_PAL), (lurker_art('half'), LURKER_PAL),
+               (lurker_art('open', -1), LURKER_PAL), (lurker_art('open', 1), LURKER_PAL),
+               (lurker_art('open', -1, True), LURKER_PAL)],
 }
 
 
