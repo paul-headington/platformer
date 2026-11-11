@@ -42,6 +42,8 @@ const STEP_UP = 10;
 const STEP_DOWN = 8;
 /** Player sheet frames (see tools/sprites.py). */
 const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
+/** The armed poses sit this many frames after the unarmed ones. */
+const PLAYER_GUN_OFFSET = 10;
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -684,13 +686,14 @@ export class GameScene extends Phaser.Scene {
     // Letting go of jump early gives a shorter hop.
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
+    const armed = this.showGun();
     if (!onGround) {
       p.anims.stop();
-      p.setFrame(body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall);
+      p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (armed ? PLAYER_GUN_OFFSET : 0));
     } else if (body.velocity.x !== 0) {
-      p.anims.play('player-run', true);
+      p.anims.play(armed ? 'player-run-gun' : 'player-run', true);
     } else {
-      p.anims.play('player-idle', true);
+      p.anims.play(armed ? 'player-idle-gun' : 'player-idle', true);
     }
   }
 
@@ -750,6 +753,11 @@ export class GameScene extends Phaser.Scene {
     p.setVelocity(0, vy);
     if (vy === 0) p.anims.pause();
     else if (p.anims.isPaused) p.anims.resume();
+  }
+
+  /** Whether to draw the player holding the gun: once picked up, if the sheet has the armed frames. */
+  private showGun(): boolean {
+    return !!this.registry.get(REG.hasGun) && this.textures.get('player').has(String(PLAYER_FRAME.fall + PLAYER_GUN_OFFSET));
   }
 
   private shoot(time: number): void {

@@ -196,6 +196,37 @@ LEGS_CLIMB = """
 """
 
 
+# Holding the gun: the front arm points forward, the hand grips a small pistol
+# (GUN_IN_HAND is stamped on top, level with the bullet's spawn point).
+BODY_AIM = """
+....kkkkkk....
+...kjjjjljk...
+..kJjjjjljjkkk
+..kJjjjjljjjjk
+..kJjjjjljkkk.
+..ksJjjjljk...
+...kkkkkkkk...
+"""
+
+BODY_AIM_RUN = """
+....kkkkkk....
+...kjjjjljk...
+..kJjjjjljjkkk
+.kkJjjjjljjjjk
+ksJJjjjjljkkk.
+.kkJjjjjljk...
+...kkkkkkkk...
+"""
+
+GUN_IN_HAND = """
+.kkkkkk
+jjjsmmm
+jJksMMM
+kkkskkk
+...kk..
+"""
+
+
 def mirror(part):
     return '\n'.join(row[::-1] for row in part.strip('\n').split('\n'))
 
@@ -209,7 +240,13 @@ def pose(head_dy, body, legs, legs_dy=0):
     return [(legs, 3, 17 + legs_dy), (body, 3, 10 + head_dy), (HEAD, 5, head_dy)]
 
 
-# Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb.
+def gun_pose(head_dy, body, legs):
+    return pose(head_dy, body, legs) + [(GUN_IN_HAND, 13, 11 + head_dy)]
+
+
+# Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb,
+# then the same idle/run/jump/fall poses holding the gun: 10-11 idle, 12-15 run,
+# 16 jump, 17 fall.
 PLAYER = [
     pose(0, BODY_IDLE, LEGS_STAND),
     pose(1, BODY_IDLE, LEGS_STAND),
@@ -221,6 +258,14 @@ PLAYER = [
     pose(0, BODY_ARMS_UP, LEGS_DANGLE),
     climb_pose(False),
     climb_pose(True),
+    gun_pose(0, BODY_AIM, LEGS_STAND),
+    gun_pose(1, BODY_AIM, LEGS_STAND),
+    gun_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
+    gun_pose(0, BODY_AIM, LEGS_PASS),
+    gun_pose(1, BODY_AIM, LEGS_STRIDE),
+    gun_pose(0, BODY_AIM, LEGS_PASS),
+    gun_pose(0, BODY_AIM, LEGS_TUCK),
+    gun_pose(0, BODY_AIM, LEGS_DANGLE),
 ]
 
 ZOMBIE_HEAD = """
