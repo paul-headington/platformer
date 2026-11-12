@@ -1419,7 +1419,7 @@ def door_art(open_):
     return c.crop(0, 0, 16, 32)
 
 
-def sky_art(w=448, h=248):
+def sky_art(w=448, h=264):
     """The night sky behind the house: a violet gradient, stars and a big moon."""
     import random
     rnd = random.Random(3)
@@ -1499,6 +1499,7 @@ ROOF_PAL = {'y': (100, 82, 122), 'r': (70, 56, 92), 'R': (44, 34, 62)}
 LADDER_PAL = {'w': (140, 100, 64), 'q': (96, 66, 42), 'x': (54, 36, 26)}
 MAUVE_PAL = {'U': (46, 32, 54), 'u': (54, 38, 62), 'v': (78, 56, 88), 'V': (66, 46, 76),
              't': (104, 70, 54), 'T': (74, 50, 40), 'k': (30, 20, 22), 'q': (58, 38, 34)}
+SAGE_PAL = {**MAUVE_PAL, 'U': (30, 44, 38), 'u': (36, 52, 44), 'v': (58, 80, 64), 'V': (48, 68, 54)}
 TEAL_PAL = {**MAUVE_PAL, 'U': (26, 36, 50), 'u': (30, 42, 58), 'v': (46, 64, 84), 'V': (38, 54, 72)}
 ATTIC_PAL = {'p': (52, 42, 52), 'P': (44, 35, 45), 'o': (26, 20, 28), 'n': (96, 90, 104)}
 WINDOW_PAL = {'F': (66, 46, 40), 'f': (98, 70, 54), 'n': (20, 28, 64), 'N': (32, 44, 92), 's': (210, 220, 255),
@@ -1549,10 +1550,12 @@ TILE_SHEETS = {
               (FLAGSTONE, CELLAR_STONE_PAL), (CRATE, WOOD_PAL),
               (TRAP_BOARDS, TRAP_WOOD_PAL), (TRAP_OPEN, TRAP_OPEN_PAL),
               (TRAP_FLAG, TRAP_STONE_PAL), (TRAP_OPEN_FLAG, TRAP_OPEN_STONE_PAL)],
-    # 0 attic planks, 1-3 upstairs wallpaper / rail / panelling, 4-6 downstairs, 7 cellar wall, 8 floor gap
+    # 0 attic planks, 1-3 upstairs wallpaper / rail / panelling, 4-6 downstairs, 7 cellar wall, 8 floor gap,
+    # 9-11 top-floor gallery and nursery (sage green)
     'back': [(ATTIC_PLANKS, ATTIC_PAL), (WALLPAPER, MAUVE_PAL), (WALLPAPER_RAIL, MAUVE_PAL), (WAINSCOT, MAUVE_PAL),
              (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
-             (FLOOR_GAP, ATTIC_PAL)],
+             (FLOOR_GAP, ATTIC_PAL),
+             (WALLPAPER, SAGE_PAL), (WALLPAPER_RAIL, SAGE_PAL), (WAINSCOT, SAGE_PAL)],
     # 0-3 window (top-left, top-right, bottom-left, bottom-right), 4-5 cobweb (left, right corner),
     # 6-7 portraits, 8-9 bookcase (top, bottom), 10 air vent,
     # 11-15 library bookcase (top, middle, middle, base, middle with the loose book's gap), 16 armchair

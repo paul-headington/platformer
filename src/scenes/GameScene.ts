@@ -50,6 +50,7 @@ const TRAP_OPENS: Record<number, number> = { [TRAP_BOARDS]: TRAP_BOARDS_OPEN, [T
 /** Frames in the 'back' sheet: [plain wallpaper, wallpaper with dado rail, panelling] per zone. */
 const BACK: Record<BackStyle, [number, number, number]> = {
   attic: [0, 0, 0],
+  gallery: [9, 10, 11],
   upstairs: [1, 2, 3],
   downstairs: [4, 5, 6],
   cellar: [7, 7, 7],
