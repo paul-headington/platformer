@@ -24,9 +24,10 @@ Zombies wander their floor until they spot you ahead of them (or hear you right 
 | Jump | Space or Z (hold for a higher jump). Up and W also jump when you're not at a ladder |
 | Climb a ladder | Up / Down (or W / S). Down on the top of a ladder climbs down; jump to let go |
 | Shoot (once you have the gun) | X or Ctrl |
+| Use (pull a loose book, say) | E, when the prompt shows |
 | Restart after winning or game over | Enter |
 
-On phones and tablets, on-screen buttons appear automatically (a d-pad for moving and climbing, FIRE, JUMP), and you tap anywhere to restart. Hold the device sideways.
+On phones and tablets, on-screen buttons appear automatically (a d-pad for moving and climbing, FIRE, JUMP, and USE when there is something in reach), and you tap anywhere to restart. Hold the device sideways.
 
 ## Platforms
 

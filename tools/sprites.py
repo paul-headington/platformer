@@ -1078,6 +1078,69 @@ def bookcase_art():
     return [c.crop(0, 0, 16, 16), c.crop(0, 16, 16, 16)]
 
 
+def _books(c, rnd, x0, x1, top, h):
+    """Fills one shelf, from x0 to x1 (exclusive), with books up to h pixels tall standing on row top + h."""
+    c.rect(x0, top, x1 - x0, h, 'o')     # shadowy shelf back
+    x = x0
+    while x < x1:
+        bh = min(h, rnd.choice([h - 2, h - 1, h, h]))
+        width = 1 if rnd.random() < 0.3 else 2
+        c.rect(x, top + h - bh, min(width, x1 - x), bh, rnd.choice('123456'))
+        if bh >= 5 and width == 2 and rnd.random() < 0.5:
+            c.rect(x, top + h - bh + 1, min(width, x1 - x), 1, 'y')   # gilt band on the spine
+        x += width + (1 if rnd.random() < 0.15 else 0)
+
+
+def library_art():
+    """
+    Tall library bookcases, 16px wide, that stack into a wall of books: a top with a
+    carved cornice, two middle tiles (different books), a cupboard base, and a middle
+    tile with a gap on its lower shelf where the loose book (see PULL_BOOK) stands.
+    """
+    import random
+    tiles = []
+    for kind in ('top', 'mid', 'mid', 'base', 'gap'):
+        rnd = random.Random(len(tiles) * 11 + 5)
+        c = Canvas(16, 16)
+        c.rect(0, 0, 16, 16, 'F')
+        c.rect(15, 0, 1, 16, 'k')        # a dark seam between neighbouring cases
+        shelves = {'top': [(4, 3)], 'mid': [(0, 7), (8, 7)], 'base': [(0, 7)], 'gap': [(0, 7), (8, 7)]}[kind]
+        for top, h in shelves:
+            _books(c, rnd, 2, 14, top, h)
+            c.rect(1, top + h, 14, 1, 'f')   # the shelf
+        if kind == 'top':
+            c.rect(0, 0, 16, 2, 'f'), c.rect(0, 2, 16, 1, 'F')
+            for x in range(1, 16, 3):
+                c.px(x, 1, 'q')          # carved dentils
+            c.rect(2, 11, 12, 4, 'o')    # top shelf of the middle tile carries on below
+            _books(c, rnd, 2, 14, 8, 7)
+            c.rect(1, 15, 14, 1, 'f')
+        if kind == 'base':
+            c.rect(2, 9, 12, 6, 'q')     # cupboard doors
+            c.rect(7, 9, 1, 6, 'F'), c.px(6, 12, 'y'), c.px(8, 12, 'y')
+            c.rect(0, 15, 16, 1, 'f')
+        if kind == 'gap':
+            c.rect(6, 8, 3, 7, 'o')      # where the loose book stands
+        tiles.append(c.crop(0, 0, 16, 16))
+    return tiles
+
+
+def armchair_art():
+    """A 16x16 high-backed reading chair in worn wine-red velvet, facing right."""
+    c = Canvas(16, 16)
+    c.rect(2, 2, 4, 11, 'c')             # tall back
+    c.rect(2, 2, 4, 1, 'C'), c.rect(3, 1, 2, 1, 'c')
+    c.rect(5, 3, 1, 9, 'C')
+    c.rect(4, 9, 10, 3, 'c')             # seat cushion
+    c.rect(4, 9, 10, 1, '1')
+    c.rect(11, 6, 3, 4, 'c'), c.rect(11, 6, 3, 1, '1')   # arm
+    c.rect(3, 12, 11, 2, 'C')            # skirt
+    c.rect(3, 14, 1, 2, 'F'), c.rect(12, 14, 1, 2, 'F')  # legs
+    c.px(13, 15, 'F'), c.px(2, 15, 'F')
+    c.px(4, 6, 'C'), c.px(3, 8, '1')     # a worn patch
+    return c.crop(0, 0, 16, 16)
+
+
 def vent_art():
     """A 16x16 iron air vent: a dark duct behind four slats."""
     c = Canvas(16, 16)
@@ -1210,6 +1273,39 @@ def sky_art(w=448, h=248):
     return img
 
 
+# The book on the library shelf that is really a lever: a fat old book with a
+# cracked gilt spine. Phaser tips it out of the shelf when it is pulled.
+PULL_BOOK = """
+.ry.
+rRRr
+rYYr
+rRRr
+rRRr
+rRRr
+rYYr
+rrrr
+"""
+
+# A rug that hides the secret hatch. Seen from the side it is a thin strip on the
+# floor, with a woven border and a fringe at each end.
+def rug_art(w=44):
+    c = Canvas(w, 3)
+    c.rect(2, 0, w - 4, 3, 'c')
+    for x in range(3, w - 3, 4):
+        c.px(x, 1, 'y'), c.px(x + 2, 1, '4')
+    c.rect(2, 2, w - 4, 1, 'C')
+    for x in (0, 1, w - 2, w - 1):
+        c.px(x, 2, 'f')                  # fringe
+    return c.crop(0, 0, w, 3)
+
+
+# The secret hatch's lid, seen edge-on: Phaser swings it up on its hinge.
+HATCH_LID = """
+wwwwwwwwwwwwwwww
+WWWkWWWWWWWWkWWW
+xxxxxxxxxxxxxxxx
+"""
+
 # Moonlit palettes. Letters are reused between palettes on purpose: the same
 # map drawn in a different palette gives the cellar stone, the two wallpapers, etc.
 STONE_PAL = {'a': (34, 30, 50), 'b': (82, 76, 104), 'c': (112, 106, 136), 'd': (62, 56, 84)}
@@ -1234,6 +1330,10 @@ DECOR_PAL = {**WINDOW_PAL, 'e': (196, 196, 216, 170), 'E': (170, 170, 196, 120),
              'F': (64, 44, 36), 'o': (22, 16, 20), 'q': (84, 58, 42),
              '1': (110, 40, 52), '2': (40, 72, 90), '3': (96, 86, 50), '4': (60, 46, 82)}
 BOOK_PAL = {**DECOR_PAL, 'f': (98, 70, 54), 'y': (196, 150, 60)}
+LIBRARY_PAL = {**BOOK_PAL, 'k': (30, 20, 24), '5': (70, 92, 60), '6': (128, 96, 70)}
+CHAIR_PAL = {'c': (110, 34, 52), 'C': (72, 22, 38), '1': (148, 58, 72), 'F': (54, 36, 30)}
+PULL_BOOK_PAL = {'r': (60, 22, 30), 'R': (122, 34, 44), 'Y': (214, 170, 80), 'y': (255, 236, 170)}
+RUG_PAL = {'c': (104, 36, 44), 'C': (70, 24, 34), 'y': (200, 156, 72), '4': (60, 46, 82), 'f': (210, 196, 160)}
 CANDLE_PAL = {'o': (255, 160, 48), 'O': (255, 240, 170), 'w': (232, 224, 200), 'W': (190, 180, 160),
               'y': (214, 170, 80), 'Y': (150, 110, 40)}
 SNAKE_PAL = {'G': (28, 70, 34), 'g': (62, 132, 56), 'h': (128, 176, 64), 'y': (196, 186, 96), 'r': (255, 70, 50),
@@ -1270,10 +1370,14 @@ TILE_SHEETS = {
              (WALLPAPER, TEAL_PAL), (WALLPAPER_RAIL, TEAL_PAL), (WAINSCOT, TEAL_PAL), (STONE, CELLAR_BACK_PAL),
              (FLOOR_GAP, ATTIC_PAL)],
     # 0-3 window (top-left, top-right, bottom-left, bottom-right), 4-5 cobweb (left, right corner),
-    # 6-7 portraits, 8-9 bookcase (top, bottom), 10 air vent
+    # 6-7 portraits, 8-9 bookcase (top, bottom), 10 air vent,
+    # 11-15 library bookcase (top, middle, middle, base, middle with the loose book's gap), 16 armchair
     'decor': [(w, WINDOW_PAL) for w in WINDOW] + [(COBWEB, DECOR_PAL), (mirror(COBWEB), DECOR_PAL),
               (PORTRAIT_LADY, DECOR_PAL), (PORTRAIT_MOON, DECOR_PAL)] + [(b, BOOK_PAL) for b in BOOKCASE] +
-             [(vent_art(), VENT_PAL)],
+             [(vent_art(), VENT_PAL)] + [(t, LIBRARY_PAL) for t in library_art()] + [(armchair_art(), CHAIR_PAL)],
+    'pull-book': [(PULL_BOOK, PULL_BOOK_PAL)],
+    'rug': [(rug_art(), RUG_PAL)],
+    'hatch-lid': [(HATCH_LID, WOOD_PAL)],
     'candle': [(f, CANDLE_PAL) for f in CANDLE],
     # A snake in the pit under a trapdoor: 0 just its head, 1 halfway, 2 reared up, tongue out, 3 striking
     'snake': [(rise(SNAKE_BODY, 13), SNAKE_PAL), (rise(SNAKE_BODY, 6), SNAKE_PAL),

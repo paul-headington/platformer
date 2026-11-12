@@ -12,12 +12,19 @@
  *   T  trapdoor: put it in a floor, in place of a #. It looks almost exactly like
  *      the floor around it, and drops the player into a pit of snakes. A run of
  *      T is one wide trapdoor. Zombies are too light to set one off.
+ *   h  secret hatch: put it in a floor, in place of the top H of a ladder. It is
+ *      floor, hidden under a rug, until the player pulls the loose book (B); then
+ *      it swings open onto the ladder. Enemies treat it as floor until then too.
+ *   B  the loose book, on a library bookcase (L). Standing in front of it, E (or
+ *      the USE button on touch screens) pulls it and opens the nearest hatch.
  *
  * Decorations (no collision, drawn behind the player):
  *
  *   w  window; draw it 2x2 (ww on two rows)   %  cobweb; put it in a corner
  *   f  portrait                                b  bookcase; two rows tall
  *   c  candle on a wall sconce
+ *   L  library bookcase; stack them as tall as you like (cornice on top, cupboard at the floor)
+ *   a  reading armchair
  *   v  air vent, high on a wall. Tentacles reach out of it now and then.
  *   M  the thing in the cupboard under the stairs; its bottom-left tile, inside a
  *      solid block at least 2x2. Counts as wall.
@@ -42,7 +49,8 @@
  * The route: through the downstairs hall (the gun on the first shelf, the
  * rock salt shotgun on the shelf at the foot of the stairs), up the grand staircase, east along the
  * upstairs landing, up the ladder into the attic for the key, then drop through
- * the broken floorboards, down the trapdoor into the cellar, and up into the
+ * the broken floorboards, back to the library at the start, pull the loose book
+ * to open the secret hatch under the rug, climb down into the cellar, and up into the
  * east wing to the door.
  *
  * The map is a raw string (so \ needs no escaping), split into rows below.
@@ -70,14 +78,14 @@ const MAP = String.raw`
 #                                    b  #                                   z             H   * *  #
 ######################TT######  ############        /#############TTT###############################
 #%            #%                  #       %        /##%                     #%                     #
-#             #     v             #               /###      v               #                      #
-#        ww   #         f   f     #     f        /####        ww            #         f     ww     #
-# c      ww c #           c       #             /#####        ww  c   g   c #               ww    c#
-#             #     G             #  *S*       /######               * *    #            **        #
-#                 =====             =====     /#######              =====               ====       #
-#               b               b            /########                        b                    #
-#  P            b     * *   z   b           /###M#####                        b z               D  #
-######H###################################################H#####TT##################TTT#############
+#  c     c    #     v             #               /###      v               #                      #
+#LL    ww   LL#         f   f     #     f        /####        ww            #         f     ww     #
+#LL    ww   LL#           c       #             /#####        ww  c   g   c #               ww    c#
+#LL         LL#     G             #  *S*       /######               * *    #            **        #
+#LL         LB    =====             =====     /#######              =====               ====       #
+#LL         LL  b               b            /########                        b                    #
+#LLP     a  LL  b     * *   z   b           /###M#####                        b z               D  #
+######h###################################################H#####TT##################TTT#############
 #%    H                       v                          %H       v                               %#
 #     H                                                   H                                        #
 #     H                                                   H                                        #

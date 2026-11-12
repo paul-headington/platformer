@@ -52,7 +52,12 @@ const BACK: Record<BackStyle, [number, number, number]> = {
 };
 const BACK_FLOOR_GAP = 8;
 /** Frames in the 'decor' sheet. */
-const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase: 8, vent: 10 } as const;
+const DECOR = {
+  window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase: 8, vent: 10,
+  libraryTop: 11, libraryMid: 12, libraryBase: 14, libraryGap: 15, armchair: 16,
+} as const;
+/** How close (px) the player's middle must be to the loose book to pull it. */
+const BOOK_REACH = { x: 10, y: 28 };
 /** Stairs can be stepped up or down this far in one frame. */
 const STEP_UP = 10;
 const STEP_DOWN = 8;
@@ -69,6 +74,23 @@ const BURN_TIME = 900;
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
 type State = 'playing' | 'dying' | 'won' | 'over';
+
+/**
+ * A secret hatch: a run of h tiles over the top of a ladder, hidden under a rug.
+ * It is floor until a loose book is pulled, then it swings open onto the ladder.
+ */
+interface Hatch {
+  tiles: Phaser.Tilemaps.Tile[];
+  rug: Phaser.GameObjects.Image;
+  lid: Phaser.GameObjects.Image;
+}
+
+/** A book on a library shelf that opens the nearest secret hatch. */
+interface LooseBook {
+  book: Phaser.GameObjects.Image;
+  hatch: Hatch | undefined;
+  pulled: boolean;
+}
 
 /** A trapdoor: a run of T tiles in one floor that opens as one. */
 interface Trap {
@@ -92,7 +114,16 @@ export class GameScene extends Phaser.Scene {
   private spawn = new Phaser.Math.Vector2();
   private levelHeight = 0;
   private nav!: NavGrid;
+  /** The level as the enemies see it: changes when a secret hatch opens. */
+  private navRows: string[] = [];
+  private world!: ZombieWorld;
   private traps: Trap[] = [];
+  private hatches: Hatch[] = [];
+  private books: LooseBook[] = [];
+  /** The loose book the player is standing in front of, if any. */
+  private bookInReach: LooseBook | null = null;
+  /** A small key hint that floats over a loose book while the player is in front of it. */
+  private useHint!: Phaser.GameObjects.Text;
   /** The trapdoor the player last fell through; it shuts again when they respawn. */
   private sprung: Trap | null = null;
 
@@ -104,6 +135,7 @@ export class GameScene extends Phaser.Scene {
   private keyJump: Phaser.Input.Keyboard.Key[] = [];
   private keyFire: Phaser.Input.Keyboard.Key[] = [];
   private keySwitch: Phaser.Input.Keyboard.Key[] = [];
+  private keyUse: Phaser.Input.Keyboard.Key[] = [];
   private keyRestart!: Phaser.Input.Keyboard.Key;
 
   private state: State = 'playing';
@@ -133,6 +165,9 @@ export class GameScene extends Phaser.Scene {
     this.invulnerableUntil = this.climbBlockedUntil = 0;
     this.climbing = this.onStairs = this.toldImmune = false;
     this.traps = [];
+    this.hatches = [];
+    this.books = [];
+    this.bookInReach = null;
     this.sprung = null;
     pad.reset();
 
@@ -142,6 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set(REG.weapon, null);
     this.registry.set(REG.weapons, []);
     this.registry.set(REG.hasKey, false);
+    this.registry.set(REG.canUse, false);
     if (!this.scene.isActive('Hud')) this.scene.launch('Hud');
 
     this.buildLevel(LEVEL_1);
@@ -163,15 +199,20 @@ export class GameScene extends Phaser.Scene {
     // T marks a trapdoor; until it opens it is floor, to the zombies and the floor art alike.
     const trapCells = new Set<string>();
     level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'T' && trapCells.add(`${tx},${ty}`)));
-    const rows = level.rows.map((row) => row.replaceAll('M', '#').replaceAll('T', '#'));
+    // h marks a secret hatch over a ladder; until it opens it is floor too.
+    const hatchCells: [number, number][] = [];
+    level.rows.forEach((row, ty) => [...row].forEach((ch, tx) => ch === 'h' && hatchCells.push([tx, ty])));
+    const rows = level.rows.map((row) => row.replaceAll('M', '#').replaceAll('T', '#').replaceAll('h', '#'));
     const outside = GameScene.findSky(rows);
     const zoneOf = (ty: number) => level.zones.filter((z) => z.fromRow <= ty).at(-1)?.style ?? 'downstairs';
     const at = (tx: number, ty: number) => rows[ty]?.[tx] ?? '#';
+    this.navRows = rows;
     this.nav = new NavGrid(rows);
 
     const data = rows.map((row, ty) =>
       [...row].map((ch, tx) => {
-        if (ch !== '#') return GameScene.tileFor(ch, at(tx, ty - 1));
+        // A ladder under a closed hatch carries on up to it, so its top rung is the hatch's.
+        if (ch !== '#') return GameScene.tileFor(ch, level.rows[ty - 1]?.[tx] === 'h' ? 'H' : at(tx, ty - 1));
         if (outside[ty - 1]?.[tx]) return ROOF;
         const above = at(tx, ty - 1);
         if (above === '#' || GameScene.isStairsChar(above)) return WALL;
@@ -187,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.layer.setCollision([...SOLID, SHELF, LADDER_TOP, STAIRS_UP_RIGHT, STAIRS_UP_LEFT]);
     this.buildBackdrop(rows, outside, zoneOf);
     for (const [tx, ty] of lurkers) this.addLurker(tx * TILE, (ty + 1) * TILE);
+    this.addHatches(hatchCells);
 
     const worldWidth = this.layer.width;
     this.levelHeight = this.layer.height;
@@ -230,6 +272,9 @@ export class GameScene extends Phaser.Scene {
           case 'P':
             this.spawn.set(cx, bottom - 12);
             break;
+          case 'B':
+            this.addLooseBook(tx, ty);
+            break;
           case 'z': {
             const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
             (z.body as Body).setSize(8, 21).setOffset(6, 3);
@@ -250,14 +295,20 @@ export class GameScene extends Phaser.Scene {
     (this.player.body as Body).setSize(8, 22).setOffset(6, 2);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
-    const world: ZombieWorld = {
+    const world: ZombieWorld = (this.world = {
       nav: this.nav,
       player: this.player,
       playerIsFair: () => this.state === 'playing' && this.time.now >= this.invulnerableUntil,
       playerIsClimbing: () => this.climbing,
       stairSurface: (body, maxDrop) => this.stairSurface(body, maxDrop),
-    };
+    });
     for (const z of this.zombies.getChildren() as Sprite[]) z.setData('brain', new ZombieBrain(z, world));
+    this.useHint = this.add
+      .text(0, 0, 'E', { fontFamily: 'monospace', fontSize: '7px', color: '#fff4c0', backgroundColor: '#1a1026', padding: { x: 2, y: 0 } })
+      .setOrigin(0.5, 1)
+      .setDepth(12)
+      .setAlpha(0.85)
+      .setVisible(false);
     for (const g of this.ghosts.getChildren() as Sprite[]) g.setData('brain', new GhostBrain(g, world, g.getData('phase')));
 
     // Open bottom edge so falling into a pit is possible.
@@ -339,6 +390,43 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Groups the h tiles into hatches. Each is hidden under a rug, with its lid ready
+   * to swing up on its left-hand hinge when it opens.
+   */
+  private addHatches(cells: [number, number][]): void {
+    let current: Phaser.Tilemaps.Tile[] = [];
+    const runs: Phaser.Tilemaps.Tile[][] = [];
+    for (const [tx, ty] of cells) {
+      const tile = this.layer.getTileAt(tx, ty)!;
+      const prev = current.at(-1);
+      if (!prev || prev.y !== ty || prev.x !== tx - 1) runs.push((current = []));
+      current.push(tile);
+    }
+    for (const tiles of runs) {
+      const left = tiles[0].pixelX;
+      const width = tiles.length * TILE;
+      const top = tiles[0].pixelY;
+      const rug = this.add.image(left + width / 2, top, 'rug').setOrigin(0.5, 1).setDepth(1);
+      const lid = this.add.image(left, top, 'hatch-lid').setOrigin(0, 0).setDisplaySize(width, 3).setDepth(1).setVisible(false);
+      this.hatches.push({ tiles, rug, lid });
+    }
+  }
+
+  /** A loose book on the gap tile of a library bookcase, tied to the hatch nearest it. */
+  private addLooseBook(tx: number, ty: number): void {
+    const x = tx * TILE + 7.5;
+    const y = ty * TILE + 15;
+    const book = this.add.image(x, y, 'pull-book').setOrigin(0.5, 1).setDepth(-1.9);
+    const dist = (h: Hatch) => Phaser.Math.Distance.Between(x, y, h.tiles[0].getCenterX(), h.tiles[0].pixelY);
+    const hatch = this.hatches.slice().sort((a, b) => dist(a) - dist(b))[0];
+    // Every few seconds a faint glint runs up its gilt spine: easy to miss, but there to spot.
+    const glint = this.add.rectangle(x, y - 6, 2, 1, 0xfff4c0).setDepth(-1.8).setAlpha(0);
+    this.tweens.add({ targets: glint, alpha: 0.9, y: y - 2, duration: 260, yoyo: true, repeat: -1, repeatDelay: 4200, delay: 1500 });
+    book.setData('glint', glint);
+    this.books.push({ book, hatch, pulled: false });
+  }
+
   private static tileFor(ch: string, above: string | undefined): number {
     switch (ch) {
       case 'X': return CRATE;
@@ -406,6 +494,16 @@ export class GameScene extends Phaser.Scene {
             return DECOR.portrait + (tx % 2);
           case 'b':
             return DECOR.bookcase + (rows[ty - 1]?.[tx] === 'b' ? 1 : 0);
+          case 'L': {
+            // Library bookcases stack: a cornice on top, a cupboard at the floor, shelves between.
+            if (!'LB'.includes(rows[ty - 1]?.[tx] ?? '')) return DECOR.libraryTop;
+            if (solidAt(tx, ty + 1)) return DECOR.libraryBase;
+            return DECOR.libraryMid + ((tx * 3 + ty) % 2);
+          }
+          case 'B':
+            return DECOR.libraryGap;
+          case 'a':
+            return DECOR.armchair;
           case 'v':
             this.addTentacle(tx * TILE, ty * TILE);
             return DECOR.vent;
@@ -588,6 +686,7 @@ export class GameScene extends Phaser.Scene {
     this.keyJump = [this.cursors.space, kb.addKey(K.Z)];
     this.keyFire = [kb.addKey(K.X), kb.addKey(K.CTRL)];
     this.keySwitch = [kb.addKey(K.C), kb.addKey(K.Q)];
+    this.keyUse = [kb.addKey(K.E)];
     this.keyRestart = kb.addKey(K.ENTER);
   }
 
@@ -619,6 +718,7 @@ export class GameScene extends Phaser.Scene {
 
     this.updatePlayer(time);
     this.checkTrapdoors();
+    this.checkBooks();
 
     if (this.player.y > this.levelHeight + TILE) this.hurt(true);
   }
@@ -948,6 +1048,66 @@ export class GameScene extends Phaser.Scene {
     for (const tile of this.sprung.tiles) tile.index = this.sprung.closed;
     for (const snake of this.sprung.snakes) snake.setVisible(false);
     this.sprung = null;
+  }
+
+  // ---------------------------------------------------------------- secret hatch
+
+  /**
+   * Finds the loose book the player is standing in front of. While there is one, a
+   * key hint floats over it (the USE button lights up on touch screens), and pressing
+   * E or USE pulls it.
+   */
+  private checkBooks(): void {
+    const usePressed = [GameScene.anyJustDown(this.keyUse), pad.justDown('use')].some(Boolean);
+    const body = this.player.body as Body;
+    const near = this.climbing
+      ? null
+      : this.books.find(
+          (b) => !b.pulled && Math.abs(body.center.x - b.book.x) <= BOOK_REACH.x && Math.abs(body.center.y - (b.book.y - 4)) <= BOOK_REACH.y,
+        ) ?? null;
+    if (near !== this.bookInReach) {
+      this.bookInReach = near;
+      this.registry.set(REG.canUse, !!near);
+      if (near && !this.isTouch()) this.useHint.setPosition(near.book.x, near.book.y - 14).setVisible(true);
+      else this.useHint.setVisible(false);
+    }
+    if (near && usePressed) this.pullBook(near);
+  }
+
+  /** The book tips out of the shelf with a clunk, and somewhere in the floor a bolt slides back. */
+  private pullBook(entry: LooseBook): void {
+    entry.pulled = true;
+    this.bookInReach = null;
+    this.registry.set(REG.canUse, false);
+    this.useHint.setVisible(false);
+    (entry.book.getData('glint') as Phaser.GameObjects.Rectangle).destroy();
+    this.tweens.add({ targets: entry.book, angle: -28, x: entry.book.x - 1, duration: 220, ease: 'Back.out' });
+    const hatch = entry.hatch;
+    if (!hatch) return;
+    this.time.delayedCall(350, () => {
+      this.cameras.main.shake(260, 0.004);
+      this.openHatch(hatch);
+    });
+  }
+
+  /**
+   * The rug slides away, the lid swings up on its hinge and the ladder underneath
+   * is free to climb. Zombies and ghosts can use the way down from now on too.
+   */
+  private openHatch(hatch: Hatch): void {
+    const width = hatch.tiles.length * TILE;
+    this.tweens.add({ targets: hatch.rug, x: hatch.rug.x - width - 6, scaleX: 0.75, duration: 500, ease: 'Quad.out' });
+    this.time.delayedCall(300, () => {
+      for (const tile of hatch.tiles) tile.index = LADDER_TOP;
+      hatch.lid.setVisible(true);
+      this.tweens.add({ targets: hatch.lid, angle: -100, duration: 450, ease: 'Bounce.out' });
+      this.navRows = this.navRows.map((row, ty) =>
+        [...row].map((ch, tx) => (hatch.tiles.some((t) => t.x === tx && t.y === ty) ? 'H' : ch)).join(''),
+      );
+      this.nav = new NavGrid(this.navRows);
+      this.world.nav = this.nav;
+      this.say(`A secret passage!\n${this.isTouch() ? 'Hold down' : 'Press Down'} on the hatch to climb into the cellar`);
+    });
   }
 
   // ---------------------------------------------------------------- events
