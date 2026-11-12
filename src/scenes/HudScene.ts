@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, REG, WEAPONS, type WeaponId } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, REG, WEAPONS, type WeaponId, type WeaponStats } from '../config';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
 
@@ -14,6 +14,8 @@ export class HudScene extends Phaser.Scene {
   private message!: Phaser.GameObjects.Text;
   /** The touch USE button: only shown while there is something in reach to use. */
   private useButton: Phaser.GameObjects.GameObject[] = [];
+  /** The touch FIRE button's label: it reads SLASH while the machete is in hand. */
+  private fireLabel?: Phaser.GameObjects.Text;
 
   constructor() {
     super('Hud');
@@ -24,7 +26,7 @@ export class HudScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
     this.scoreText = this.add.text(4, 2, '', style);
     this.livesText = this.add.text(110, 2, '', style);
-    // One icon per weapon, right to left before the key. Tapping or clicking them switches guns.
+    // One icon per weapon, right to left before the key. Tapping or clicking them switches weapons.
     this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
     let right = GAME_WIDTH - 28;
     for (const id of (Object.keys(WEAPONS) as WeaponId[]).reverse()) {
@@ -78,6 +80,7 @@ export class HudScene extends Phaser.Scene {
     this.weaponMark.setVisible(!!heldIcon && owned.length > 1);
     if (heldIcon) this.weaponMark.setPosition(heldIcon.x - heldIcon.displayWidth / 2, 6).setSize(heldIcon.displayWidth + 4, 11);
     this.keyIcon.setAlpha(this.registry.get(REG.hasKey) ? 1 : 0.15);
+    this.fireLabel?.setText(held && (WEAPONS[held] as WeaponStats).melee ? 'SLASH' : 'FIRE');
     const canUse = !!this.registry.get(REG.canUse);
     for (const part of this.useButton) {
       (part as unknown as Phaser.GameObjects.Components.Visible).setVisible(canUse);
@@ -105,7 +108,7 @@ export class HudScene extends Phaser.Scene {
     this.touchButton('up', cx, cy - 24, (x, by) => tri(x, by, 0, 6, 12, 6, 6, 0), 13, { y: cy - 28, w: 28, h: 32 });
     this.touchButton('down', cx, cy + 24, (x, by) => tri(x, by, 0, 0, 12, 0, 6, 6), 13, { y: cy + 28, w: 28, h: 32 });
     const y = GAME_HEIGHT - 28;
-    this.touchButton('fire', GAME_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'));
+    this.fireLabel = this.touchButton('fire', GAME_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'))[1] as Phaser.GameObjects.Text;
     this.touchButton('jump', GAME_WIDTH - 26, y, (x, by) => this.labelFor(x, by, 'JUMP'));
     // USE sits above and between them, and only appears in front of something usable.
     this.useButton = this.touchButton('use', GAME_WIDTH - 48, y - 42, (x, by) => this.labelFor(x, by, 'USE'), 14, { w: 36, h: 26 });

@@ -48,6 +48,19 @@ PALETTE = {
     'e': (150, 98, 58),    # shotgun stock (walnut)
     'E': (98, 62, 38),     # stock shade
     'x': (214, 220, 236),  # rock salt grain shade
+    # The vampire: goth rock, not a cape. Pale skin, messy black hair, black leather.
+    'q': (226, 222, 238),  # deathly pale skin
+    'Q': (166, 156, 192),  # pale skin shade
+    'h': (40, 30, 62),     # black hair
+    'H': (86, 72, 126),    # hair sheen
+    'L': (48, 42, 64),     # black leather
+    'B': (104, 96, 132),   # leather highlight
+    'i': (214, 218, 230),  # silver studs and chain
+    'R': (128, 22, 44),    # oxblood shirt
+    'u': (82, 14, 32),     # shirt shade
+    'd': (60, 58, 80),     # black jeans
+    'D': (32, 30, 44),     # jeans shade
+    'K': (122, 92, 62),    # machete grip (wrapped cord)
 }
 
 # ---------------------------------------------------------------- characters
@@ -300,6 +313,67 @@ PLAYER = [
     shotgun_pose(0, BODY_AIM, LEGS_DANGLE),
 ]
 
+# The machete, held up and ready beside the face: the grip is in the same hand
+# as the guns', with the blade standing straight up. Stamped at x=13, y=3.
+MACHETE_IN_HAND = """
+....kk.
+...kwMk
+...kwMk
+...kmMk
+...kmMk
+...kmMk
+...kmMk
+..kkkkk
+...kKk.
+jjjssk.
+jJkssk.
+kkkkKk.
+...kk..
+"""
+
+# A swing, 1: the arm goes up and the blade is raised high (body BODY_JUMP).
+MACHETE_RAISED = """
+.kk.
+kwMk
+kwMk
+kwMk
+kmMk
+kmMk
+kkkkk
+.kKk.
+"""
+
+# A swing, 2: the arm snaps forward and the blade cuts down in front.
+# Stamped at x=13, y=11, like the pistol; the slash itself is drawn by the game.
+MACHETE_STRIKE = """
+.kkkk..
+jjjssk.
+jJksskk
+kkkkkmMk
+....kmMk
+....kkmMk
+......kk.
+"""
+
+
+def machete_pose(head_dy, body, legs):
+    return pose(head_dy, body, legs) + [(MACHETE_IN_HAND, 13, 3 + head_dy)]
+
+
+# 26-27 idle, 28-31 run, 32 jump, 33 fall holding the machete; 34-35 a swing (raise, strike).
+PLAYER += [
+    machete_pose(0, BODY_AIM, LEGS_STAND),
+    machete_pose(1, BODY_AIM, LEGS_STAND),
+    machete_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
+    machete_pose(0, BODY_AIM, LEGS_PASS),
+    machete_pose(1, BODY_AIM, LEGS_STRIDE),
+    machete_pose(0, BODY_AIM, LEGS_PASS),
+    machete_pose(0, BODY_AIM, LEGS_TUCK),
+    machete_pose(0, BODY_AIM, LEGS_DANGLE),
+    pose(0, BODY_JUMP, LEGS_STAND) + [(MACHETE_RAISED, 13, 3)],
+    pose(1, BODY_AIM, LEGS_STRIDE) + [(MACHETE_STRIKE, 13, 12)],
+]
+
 ZOMBIE_HEAD = """
 ..knkkkkk...
 .knngggggk..
@@ -439,7 +513,105 @@ def ghost(tail, blink=False):
 # Frames 0-3: wisp tail sways, frame 3 blinks.
 GHOST = [ghost(0), ghost(1), ghost(2), ghost(1, blink=True)]
 
-CHAR_SIZE = {'player': (20, 24), 'zombie': (20, 24), 'ghost': (20, 20)}
+# ---------------------------------------------------------------- vampire
+# An original goth-rock vampire guarding the way out: deathly pale, messy black
+# hair falling over one eye, red eyes and fangs, a studded black leather jacket
+# over an oxblood shirt, a silver chain belt, black jeans and boots. No cape.
+
+VAMP_HEAD = """
+.k.kk.kk....
+khkhhkhhkk..
+khhHhhhHhhk.
+khhhhhHhhhhk
+khhhhHhhhqhk
+khhhhqqqkrqk
+khhhQqqqqqqk
+khhhQqqqqkkk
+.khhkQqqkwwk
+.khk.kQQqqk.
+..k...kkkk..
+"""
+
+# Hissing: the mouth gapes, fangs out.
+VAMP_HEAD_HISS = """
+.k.kk.kk....
+khkhhkhhkk..
+khhHhhhHhhk.
+khhhhhHhhhhk
+khhhhHhhhqhk
+khhhhqqqkrqk
+khhhQqqqqqkk
+khhhQqqqkwRk
+.khhkQqqkRRk
+.khk.kQQkwkk
+..k...kkkk..
+"""
+
+VAMP_BODY = """
+....kkkkkk....
+...kBiRRuBk...
+..kLLBRuRBLk..
+..kLLLRRuLLk..
+..kLLLuRRLLk..
+..kqLLiiiLqk..
+...kkkkkkkk...
+"""
+
+# Stalking: the front hand reaches out, clawed.
+VAMP_BODY_REACH = """
+....kkkkkk....
+...kBiRRuBk...
+..kLLBRuRBkkk.
+..kLLLRRuLLLqk
+..kLLLuRRLkkqk
+..kqLLiiiLk...
+...kkkkkkkk...
+"""
+
+# Lunging: both arms thrown forward, claws first.
+VAMP_BODY_LUNGE = """
+....kkkkkk.....
+...kBiRRuBkkkk.
+..kLLBRuRBLLqqk
+..kLLLRRuLLkkqk
+..kLLLuRRLk.k.k
+..kLLLiiiLk....
+...kkkkkkkk....
+"""
+
+# Where the head was.
+VAMP_STUMP = """
+.kkkk.
+kRuuRk
+.kkkk.
+"""
+
+
+def vamp_legs(legs):
+    return legs.replace('p', 'd').replace('P', 'D').replace('b', 'L')
+
+
+def vamp_pose(dy, body, legs, head=VAMP_HEAD):
+    return [(vamp_legs(legs), 3, 17), (body, 3, 10 + dy), (head, 5, dy)]
+
+
+# Frames 0-1 idle, 2-5 stalking walk, 6 crouched to lunge, 7 lunging, 8 hissing,
+# 9 headless (the head on its own is the 'vampire-head' image).
+VAMPIRE = [
+    vamp_pose(0, VAMP_BODY, LEGS_STAND),
+    vamp_pose(1, VAMP_BODY, LEGS_STAND),
+    vamp_pose(1, VAMP_BODY_REACH, LEGS_STRIDE),
+    vamp_pose(0, VAMP_BODY_REACH, LEGS_PASS),
+    vamp_pose(1, VAMP_BODY_REACH, LEGS_STRIDE),
+    vamp_pose(0, VAMP_BODY_REACH, LEGS_STAND),
+    [(vamp_legs(LEGS_TUCK), 3, 19), (VAMP_BODY_LUNGE, 3, 12), (VAMP_HEAD_HISS, 5, 2)],
+    [(vamp_legs(LEGS_STRIDE), 3, 17), (VAMP_BODY_LUNGE, 4, 11), (VAMP_HEAD_HISS, 7, 1)],
+    vamp_pose(0, VAMP_BODY_REACH, LEGS_STAND, VAMP_HEAD_HISS),
+    [(vamp_legs(LEGS_STAND), 3, 17), (VAMP_BODY, 3, 10), (VAMP_STUMP, 7, 8)],
+]
+VAMPIRE_HEAD = [VAMP_HEAD]
+
+CHAR_SIZE = {'player': (20, 24), 'zombie': (20, 24), 'ghost': (20, 20), 'vampire': (20, 24)}
 
 # ---------------------------------------------------------------- pickups
 GEM = [  # 8x8, 4-frame sparkle
@@ -521,6 +693,15 @@ kkk..kEEEEk.....
 keekkk..........
 kEeeek..........
 .kkkkk..........
+"""]
+
+# The machete pickup (and HUD icon): a long broad blade on a cord-wrapped grip.
+MACHETE = ["""
+.......kkkkkkkkk..
+.kkkk.kwwwwwwwwwkk
+kKyKKkkmmmmmmmmmmk
+kKKyKkkMMMMMMMMMk.
+.kkkk.kkkkkkkkkk..
 """]
 
 # One grain of rock salt; a shotgun blast fires a few in a fan.
@@ -1421,6 +1602,7 @@ SHEETS = {
     'player': PLAYER, 'zombie': ZOMBIE, 'ghost': GHOST,
     'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
     'shotgun': SHOTGUN, 'salt': SALT, 'emote': EMOTE,
+    'vampire': VAMPIRE, 'vampire-head': VAMPIRE_HEAD, 'machete': MACHETE,
 }
 
 

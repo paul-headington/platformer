@@ -18,6 +18,9 @@ export class BootScene extends Phaser.Scene {
     const v = `?v=${__BUILD_ID__}`;
     this.load.spritesheet('player', `player.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.spritesheet('zombie', `zombie.png${v}`, { frameWidth: 20, frameHeight: 24 });
+    this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
+    this.load.image('vampire-head', `vampire-head.png${v}`);
+    this.load.image('machete', `machete.png${v}`);
     this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
     this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
     this.load.image('key', `key.png${v}`);
@@ -45,6 +48,7 @@ export class BootScene extends Phaser.Scene {
     this.glow('glow-warm', 48, [255, 190, 110]);
     this.glow('glow-moon', 64, [140, 160, 255]);
     this.vignette();
+    this.slash();
 
     // Skips frames the sheet doesn't have (an old cached sheet, say) so a missing frame can't crash the game.
     const frames = (key: string, list: number[]) => {
@@ -64,6 +68,8 @@ export class BootScene extends Phaser.Scene {
     }
     this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
     this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
+    this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
+    this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
     // A ghost burning up: roaring flames three times over, then dying down.
     const roar = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6];
@@ -84,6 +90,22 @@ export class BootScene extends Phaser.Scene {
     grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
+    tex.refresh();
+  }
+
+  /** The streak a machete leaves in the air: a pale crescent, brightest at its leading edge, facing right. */
+  private slash(): void {
+    const w = 16;
+    const h = 28;
+    const tex = this.textures.createCanvas('slash', w, h)!;
+    const ctx = tex.getContext();
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(-6 + i, h / 2, 17 - i, -1.05, 1.05);
+      ctx.strokeStyle = ['rgba(150,160,220,0.35)', 'rgba(200,210,255,0.6)', 'rgba(235,240,255,0.85)', 'rgba(255,255,255,1)'][i];
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
     tex.refresh();
   }
 

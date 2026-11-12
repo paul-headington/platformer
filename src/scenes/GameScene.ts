@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
+import { VAMPIRE_FRAME, VampireBrain } from '../ai/VampireBrain';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
 import {
   CAMERA,
@@ -14,9 +15,12 @@ import {
   TILE,
   WEAPON_PICKUPS,
   WEAPONS,
+  type BladeStats,
   type EnemyStats,
   type EnemyType,
+  type GunStats,
   type WeaponId,
+  type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
@@ -67,7 +71,9 @@ const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
  * Where each weapon's poses start in the player sheet: idle, idle, four run, jump, fall,
  * in the same order as frames 0-7 (see tools/sprites.py).
  */
-export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 18 };
+export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 18, machete: 26 };
+/** A machete swing: the blade goes up, then comes down (frames in the player sheet). */
+const MACHETE_SWING = { raise: 34, strike: 35 } as const;
 /** How long a burning ghost takes to burn away (ms); the flames take a little longer to die down. */
 const BURN_TIME = 900;
 
@@ -110,6 +116,7 @@ export class GameScene extends Phaser.Scene {
   private door!: Phaser.Physics.Arcade.Image;
   private zombies!: Phaser.Physics.Arcade.Group;
   private ghosts!: Phaser.Physics.Arcade.Group;
+  private vampires!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
   private spawn = new Phaser.Math.Vector2();
   private levelHeight = 0;
@@ -142,10 +149,13 @@ export class GameScene extends Phaser.Scene {
   private lastGroundedAt = -Infinity;
   private jumpPressedAt = -Infinity;
   private lastShotAt = -Infinity;
+  /** The swing in progress, if any: when it started and when it ends. */
+  private swingStartedAt = -Infinity;
+  private swingUntil = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
-  /** Enemy types the player has already been told their shot can't hurt. */
-  private toldImmune = new Set<EnemyType>();
+  /** Enemy types (and whether by gun or blade) the player has already been told can't be hurt that way. */
+  private toldImmune = new Set<string>();
   private climbing = false;
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
@@ -162,6 +172,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.state = 'playing';
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
+    this.swingStartedAt = this.swingUntil = -Infinity;
     this.invulnerableUntil = this.climbBlockedUntil = 0;
     this.climbing = this.onStairs = false;
     this.toldImmune.clear();
@@ -237,6 +248,7 @@ export class GameScene extends Phaser.Scene {
     const gems = this.physics.add.staticGroup();
     this.zombies = this.physics.add.group();
     this.ghosts = this.physics.add.group({ allowGravity: false });
+    this.vampires = this.physics.add.group();
     this.bullets = this.physics.add.group({ allowGravity: false });
     const weaponPickups: { image: Phaser.Physics.Arcade.Image; weapon: WeaponId }[] = [];
     let key: Phaser.Physics.Arcade.Image | undefined;
@@ -288,6 +300,12 @@ export class GameScene extends Phaser.Scene {
             this.setEnemy(gh, 'ghost').setData('phase', tx).setAlpha(0.85).play('ghost-float');
             break;
           }
+          case 'V': {
+            const v = this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite;
+            (v.body as Body).setSize(8, 21).setOffset(6, 3);
+            this.setEnemy(v, 'vampire').play('vampire-idle');
+            break;
+          }
         }
       });
     });
@@ -311,6 +329,7 @@ export class GameScene extends Phaser.Scene {
       .setAlpha(0.85)
       .setVisible(false);
     for (const g of this.ghosts.getChildren() as Sprite[]) g.setData('brain', new GhostBrain(g, world, g.getData('phase')));
+    for (const v of this.vampires.getChildren() as Sprite[]) v.setData('brain', new VampireBrain(v, world));
 
     // Open bottom edge so falling into a pit is possible.
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
@@ -326,7 +345,7 @@ export class GameScene extends Phaser.Scene {
 
     const collides = this.tileCollides.bind(this);
     this.physics.add.collider(this.player, this.layer, undefined, collides);
-    this.physics.add.collider(this.zombies, this.layer, undefined, collides);
+    this.physics.add.collider([this.zombies, this.vampires], this.layer, undefined, collides);
     this.physics.add.collider(
       this.bullets,
       this.layer,
@@ -334,7 +353,7 @@ export class GameScene extends Phaser.Scene {
       (_b, t) => SOLID.has((t as Phaser.Tilemaps.Tile).index),
     );
 
-    this.physics.add.overlap(this.player, [this.zombies, this.ghosts], (_p, e) =>
+    this.physics.add.overlap(this.player, [this.zombies, this.ghosts, this.vampires], (_p, e) =>
       this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
     );
     this.physics.add.overlap(this.player, gems, (_p, g) => {
@@ -357,17 +376,18 @@ export class GameScene extends Phaser.Scene {
       });
     }
     this.physics.add.overlap(this.player, this.door, () => this.reachDoor());
-    this.physics.add.overlap(this.bullets, [this.zombies, this.ghosts], (b, e) => {
+    this.physics.add.overlap(this.bullets, this.enemyGroups(), (b, e) => {
       const bullet = b as Sprite;
       const enemy = e as Sprite;
       if (!bullet.active || !enemy.active) return;
       const weapon = bullet.getData('weapon') as WeaponId;
       if (!(enemy.getData('stats') as EnemyStats).hurtBy.includes(weapon)) {
-        this.passThrough(bullet, enemy);
+        this.passThrough(enemy, weapon, bullet);
         return;
       }
+      const from = Math.sign((bullet.body as Body).velocity.x) || 1;
       bullet.destroy();
-      this.shootEnemy(enemy, WEAPONS[weapon].damage);
+      this.shootEnemy(enemy, WEAPONS[weapon].damage, -from);
     });
   }
 
@@ -827,7 +847,11 @@ export class GameScene extends Phaser.Scene {
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     const held = this.heldWeapon();
-    if (!onGround) {
+    if (time < this.swingUntil) {
+      p.anims.stop();
+      const hitAt = (WEAPONS.machete as BladeStats).hitAt;
+      p.setFrame(time - this.swingStartedAt < hitAt ? MACHETE_SWING.raise : MACHETE_SWING.strike);
+    } else if (!onGround) {
       p.anims.stop();
       p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
@@ -909,8 +933,11 @@ export class GameScene extends Phaser.Scene {
     this.registry.set(REG.weapon, id);
     const touch = this.isTouch();
     if (id === 'shotgun') {
-      const swap = touch ? 'Tap the guns up top' : 'Press C';
-      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost,\nbut it bounces off zombies.\n${swap} to switch guns`);
+      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost,\nbut it bounces off zombies.\n${this.swapHint()} to switch`);
+    } else if (id === 'machete') {
+      this.say(
+        `You found ${WEAPONS[id].name}!\nOne cut fells a zombie, and it's\nthe only way to stop a vampire.\n${touch ? 'Tap SLASH to swing' : 'Press X to swing, C to switch'}`,
+      );
     } else {
       this.say(`You found ${WEAPONS[id].name}!\n${touch ? 'Tap FIRE' : 'Press X'} to shoot`);
     }
@@ -927,8 +954,13 @@ export class GameScene extends Phaser.Scene {
   private shoot(time: number): void {
     const id = this.registry.get(REG.weapon) as WeaponId | null;
     if (!id) return;
-    const weapon = WEAPONS[id];
-    if (time - this.lastShotAt < weapon.cooldown) return;
+    const stats: WeaponStats = WEAPONS[id];
+    if (time - this.lastShotAt < stats.cooldown) return;
+    if (stats.melee) {
+      this.swing(time, id, stats);
+      return;
+    }
+    const weapon = stats;
     const live = (this.bullets.getChildren() as Sprite[]).filter((b) => b.getData('weapon') === id).length;
     if (live >= weapon.maxOnScreen * weapon.pellets) return;
     this.lastShotAt = time;
@@ -950,6 +982,41 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * A swing of a blade: the arm goes up, and after `hitAt` comes down in a slash that cuts
+   * every enemy just in front of the player. Not while climbing: they need that hand.
+   */
+  private swing(time: number, id: WeaponId, blade: BladeStats): void {
+    if (this.climbing) return;
+    this.lastShotAt = this.swingStartedAt = time;
+    this.swingUntil = time + blade.swingTime;
+    this.time.delayedCall(blade.hitAt, () => {
+      if (this.state !== 'playing') return;
+      const p = this.player;
+      const body = p.body as Body;
+      const dir = p.flipX ? -1 : 1;
+      const front = dir > 0 ? body.right : body.left;
+      const hitbox = new Phaser.Geom.Rectangle(Math.min(front, front + dir * blade.reach), body.top - 4, blade.reach, body.height + 4);
+
+      const slash = this.add.image(front + dir * 6, p.y, 'slash').setFlipX(dir < 0).setDepth(11).setAlpha(0.9);
+      this.tweens.add({ targets: slash, alpha: 0, x: slash.x + dir * 4, scaleY: 1.15, duration: 160, onComplete: () => slash.destroy() });
+
+      for (const group of this.enemyGroups()) {
+        for (const enemy of [...group.getChildren()] as Sprite[]) {
+          if (!enemy.active) continue;
+          const eb = enemy.body as Body;
+          if (!Phaser.Geom.Intersects.RectangleToRectangle(hitbox, new Phaser.Geom.Rectangle(eb.x, eb.y, eb.width, eb.height))) continue;
+          if (!(enemy.getData('stats') as EnemyStats).hurtBy.includes(id)) this.passThrough(enemy, id);
+          else this.shootEnemy(enemy, blade.damage, dir < 0 ? 1 : -1);
+        }
+      }
+    });
+  }
+
+  private enemyGroups(): Phaser.Physics.Arcade.Group[] {
+    return [this.zombies, this.ghosts, this.vampires];
+  }
+
   /** Bullets go when they leave the screen; short-range shots fade out and go at the end of their range. */
   private cullBullets(): void {
     const view = this.cameras.main.worldView;
@@ -958,7 +1025,7 @@ export class GameScene extends Phaser.Scene {
         b.destroy();
         continue;
       }
-      const range = WEAPONS[b.getData('weapon') as WeaponId].range;
+      const range = (WEAPONS[b.getData('weapon') as WeaponId] as GunStats).range;
       if (range === Infinity) continue;
       const travelled = Phaser.Math.Distance.Between(b.getData('fromX'), b.getData('fromY'), b.x, b.y) / range;
       if (travelled >= 1) b.destroy();
@@ -967,46 +1034,64 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * A shot from a weapon the enemy shrugs off. Bullets go straight through a ghost,
-   * which wavers so the player can see the shot landed and did nothing. Rock salt
-   * just bounces off a zombie and scatters on the floor. The first time each
-   * happens, the player is told why and which gun to use instead.
+   * A shot or cut from a weapon the enemy shrugs off. Bullets and blades go straight
+   * through a ghost, which wavers so the player can see it landed and did nothing.
+   * Rock salt bounces off a zombie, and bullets and salt both bounce off a vampire,
+   * who hisses back. The first time each happens, the player is told what to use instead.
    */
-  private passThrough(bullet: Sprite, enemy: Sprite): void {
-    const passed = bullet.getData('passed') as Sprite[];
-    if (passed.includes(enemy)) return;
-    passed.push(enemy);
+  private passThrough(enemy: Sprite, weapon: WeaponId, bullet?: Sprite): void {
+    if (bullet) {
+      const passed = bullet.getData('passed') as Sprite[];
+      if (passed.includes(enemy)) return;
+      passed.push(enemy);
+    }
     const type = enemy.getData('type') as EnemyType;
     if (type === 'ghost') {
       const alpha = enemy.alpha;
       this.tweens.add({ targets: enemy, alpha: alpha * 0.35, duration: 70, yoyo: true, onComplete: () => enemy.setAlpha(alpha) });
-    } else {
+    } else if (bullet) {
       const { x, y } = bullet;
       const back = (bullet.body as Body).velocity.x > 0 ? -1 : 1;
+      const key = bullet.texture.key;
       bullet.destroy();
-      const grain = this.add.image(x, y, 'salt').setDepth(9);
-      this.tweens.add({ targets: grain, x: x + back * Phaser.Math.Between(6, 14), y: y + 10, alpha: 0, duration: 300, ease: 'Quad.in', onComplete: () => grain.destroy() });
+      const grain = this.add.image(x, y, key).setDepth(9);
+      this.tweens.add({ targets: grain, x: x + back * Phaser.Math.Between(6, 14), y: y + 10, alpha: 0, angle: back * 90, duration: 300, ease: 'Quad.in', onComplete: () => grain.destroy() });
     }
 
-    if (this.toldImmune.has(type)) return;
-    this.toldImmune.add(type);
+    const blade = !!(WEAPONS[weapon] as WeaponStats).melee;
+    const told = `${type}/${blade ? 'blade' : weapon}`;
+    if (this.toldImmune.has(told)) return;
+    this.toldImmune.add(told);
     const owned = this.registry.get(REG.weapons) as WeaponId[];
-    const swap = this.isTouch() ? 'Tap the guns up top' : 'Press C';
+    const swap = this.swapHint();
     if (type === 'ghost') {
+      const what = blade ? 'The blade goes' : 'Bullets go';
       this.say(
         owned.includes('shotgun')
-          ? `Bullets go straight through ghosts!\n${swap} for the rock salt`
-          : 'Bullets go straight through ghosts!\nThere must be something else...',
+          ? `${what} straight through ghosts!\n${swap} for the rock salt`
+          : `${what} straight through ghosts!\nThere must be something else...`,
+      );
+    } else if (type === 'vampire') {
+      this.say(
+        owned.includes('machete')
+          ? `${blade ? 'That' : 'Guns'} can't hurt a vampire!\n${swap} for the machete.\nOff with its head!`
+          : `${blade ? 'That' : 'Guns'} can't hurt a vampire!\nOnly a blade will take its head...`,
       );
     } else {
-      this.say(`Rock salt just bounces off zombies!\n${swap} for the gun`);
+      this.say(`Rock salt just bounces off zombies!\n${swap} for the gun${owned.includes('machete') ? ' or machete' : ''}`);
     }
+  }
+
+  private swapHint(): string {
+    return this.isTouch() ? 'Tap the weapons up top' : 'Press C';
   }
 
   private updateEnemies(time: number, delta: number): void {
     for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).update(time);
 
     for (const g of this.ghosts.getChildren() as Sprite[]) (g.getData('brain') as GhostBrain).update(time, delta);
+
+    for (const v of this.vampires.getChildren() as Sprite[]) (v.getData('brain') as VampireBrain).update(time);
   }
 
   // ---------------------------------------------------------------- trapdoors
@@ -1167,6 +1252,7 @@ export class GameScene extends Phaser.Scene {
     this.invulnerableUntil = this.time.now + PLAYER.invulnerableAfterRespawn;
     for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).forget();
     for (const g of this.ghosts.getChildren() as Sprite[]) (g.getData('brain') as GhostBrain).forget();
+    for (const v of this.vampires.getChildren() as Sprite[]) (v.getData('brain') as VampireBrain).forget();
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 100, yoyo: true, repeat: 6, onComplete: () => this.player.setAlpha(1) });
     pad.clearPresses();
     this.state = 'playing';
@@ -1186,6 +1272,11 @@ export class GameScene extends Phaser.Scene {
       this.lockedHintAt = this.time.now;
       return;
     }
+    if (this.vampires.countActive() > 0) {
+      if (this.time.now - this.lockedHintAt > 3000) this.say("The vampire won't let you near the door!\nOnly a blade can take its head.");
+      this.lockedHintAt = this.time.now;
+      return;
+    }
     this.state = 'won';
     pad.clearPresses();
     this.addScore(SCORE.exit);
@@ -1200,26 +1291,107 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A shot takes `damage` off an enemy's health: at 0 it dies, otherwise it flashes and turns on the player. */
-  private shootEnemy(enemy: Sprite, damage: number): void {
+  private shootEnemy(enemy: Sprite, damage: number, from = 0): void {
     if (!enemy.active) return;
     const health = (enemy.getData('health') as number) - damage;
     enemy.setData('health', health);
     if (health > 0) {
       enemy.setTint(ENEMY_HIT_FLASH.tint).setTintMode(Phaser.TintModes.FILL);
       this.time.delayedCall(ENEMY_HIT_FLASH.duration, () => enemy.active && enemy.clearTint().setTintMode(Phaser.TintModes.MULTIPLY));
-      (enemy.getData('brain') as ZombieBrain | GhostBrain).shot(this.time.now);
+      const brain = enemy.getData('brain') as ZombieBrain | GhostBrain | VampireBrain;
+      if (brain instanceof VampireBrain) brain.shot(this.time.now, from || undefined);
+      else brain.shot(this.time.now);
       return;
     }
-    this.killEnemy(enemy);
+    this.killEnemy(enemy, from);
   }
 
-  private killEnemy(enemy: Sprite): void {
+  private killEnemy(enemy: Sprite, from = 0): void {
     const stats = enemy.getData('stats') as EnemyStats;
     this.addScore(stats.points);
+    if (stats.death === 'behead') {
+      this.behead(enemy, from);
+      return;
+    }
     const body = this.add.image(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
     enemy.destroy();
     if (stats.death === 'burn') this.burnUp(body);
     else this.tweens.add({ targets: body, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => body.destroy() });
+  }
+
+  /**
+   * The killing cut takes the vampire's head clean off. The head spins away and
+   * rolls to a stop, the body stands a moment, then both crumble into ash.
+   * `from` is the side the blade came from; the head flies the other way.
+   */
+  private behead(enemy: Sprite, from: number): void {
+    const away = from ? -from : enemy.flipX ? 1 : -1;
+    const feet = (enemy.body as Body).bottom;
+    const flip = enemy.flipX;
+    const x = enemy.x;
+    enemy.destroy();
+    const body = this.add.image(x, feet, 'vampire', VAMPIRE_FRAME.headless).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
+    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setFlipX(flip).setDepth(6);
+    this.cameras.main.shake(140, 0.006);
+
+    // The head: up, over and down to the floor, spinning, then a short roll.
+    const landX = x + away * 30;
+    this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 650, ease: 'Linear' });
+    this.tweens.chain({
+      targets: head,
+      tweens: [
+        { y: head.y - 16, duration: 230, ease: 'Quad.out' },
+        { y: feet - 5, duration: 420, ease: 'Quad.in' },
+        { y: feet - 8, duration: 120, ease: 'Quad.out', yoyo: true },
+        { x: landX + away * 8, angle: away * 720, duration: 300, ease: 'Quad.out' },
+      ],
+      onComplete: () => this.crumble(head, feet, 300),
+    });
+    // A dark spray from the neck.
+    for (let i = 0; i < 6; i++) {
+      const drop = this.add.rectangle(x, feet - 20, 2, 2, 0x5a0c22).setDepth(6);
+      this.tweens.add({
+        targets: drop,
+        x: x + away * Phaser.Math.Between(2, 18),
+        y: feet - Phaser.Math.Between(0, 8),
+        alpha: 0,
+        duration: Phaser.Math.Between(300, 550),
+        ease: 'Quad.in',
+        onComplete: () => drop.destroy(),
+      });
+    }
+    // The body sways, its knees go, and it crumbles to dust.
+    this.tweens.add({ targets: body, angle: -away * 6, duration: 300, yoyo: true, delay: 150 });
+    this.time.delayedCall(700, () => this.crumble(body, feet, 700));
+    this.time.delayedCall(900, () => this.say('The vampire crumbles to dust!\nThe way out is clear.'));
+  }
+
+  /** Greys out, sinks into a heap and blows away as ash. */
+  private crumble(thing: Phaser.GameObjects.Image, floor: number, duration: number): void {
+    thing.setTint(0x8c8498);
+    const { x } = thing;
+    const w = thing.displayWidth;
+    this.tweens.add({
+      targets: thing,
+      scaleY: 0.05,
+      alpha: 0,
+      y: thing.originY === 1 ? floor : floor - 2,
+      duration,
+      ease: 'Quad.in',
+      onComplete: () => thing.destroy(),
+    });
+    for (let i = 0; i < Math.round(w); i++) {
+      const ash = this.add.rectangle(x + Phaser.Math.Between(-w / 2, w / 2), floor - Phaser.Math.Between(0, 18), 1, 1, 0xb0a8bc).setDepth(7);
+      this.tweens.add({
+        targets: ash,
+        x: ash.x + Phaser.Math.Between(4, 16),
+        y: floor - Phaser.Math.Between(0, 3),
+        alpha: 0,
+        delay: Phaser.Math.Between(0, duration),
+        duration: Phaser.Math.Between(400, 900),
+        onComplete: () => ash.destroy(),
+      });
+    }
   }
 
   /**

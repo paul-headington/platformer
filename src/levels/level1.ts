@@ -6,9 +6,12 @@
  *   H  ladder (Up/Down)              /  \  stairs (walk up them)
  *   *  gem                           G  gun pickup
  *   S  rock salt shotgun pickup (the only thing that hurts ghosts)
+ *   m  machete pickup (cuts down zombies; the only thing that hurts a vampire)
  *   K  key (opens the exit door)     D  exit door
  *   P  player start                  z  zombie (walks)
  *   g  ghost (floats; flies after the player, through any open space)
+ *   V  vampire: guards its stretch of floor, and the exit door won't open
+ *      while it stands. Put it a few tiles in front of the door.
  *   T  trapdoor: put it in a floor, in place of a #. It looks almost exactly like
  *      the floor around it, and drops the player into a pit of snakes. A run of
  *      T is one wide trapdoor. Zombies are too light to set one off.
@@ -54,8 +57,8 @@
  * ladder into the attic for the key, then drop through the broken floorboards
  * into the west bedroom, pull the loose book on its bookcase to open the secret
  * hatch under the rug in the library, down through the hole in the floor to the
- * hall and on into the library, climb down into the cellar, and up into the east
- * wing to the door.
+ * hall and on into the library, climb down into the cellar, pick up the machete
+ * stuck in the crates, and up into the east wing, where the vampire guards the door.
  *
  * The map is a raw string (so \ needs no escaping), split into rows below.
  */
@@ -88,13 +91,13 @@ const MAP = String.raw`
 #LL         LL#     G             #  * *       /######               * *    #            **        #
 #LL         LL    =====             =====     /#######              =====               ====       #
 #LL         LL  b               b            /########                        b                    #
-#LL      a  LL  b     * * P     b        z  /###M#####                        b z               D  #
+#LL      a  LL  b     * * P     b        z  /###M#####                        b z           V   D  #
 ######h###################################################H#####TT##################TTT#############
 #%    H                       v                          %H       v                               %#
 #     H                                                   H                                        #
 #     H                                                   H                                        #
 #     H    ** c                      * *      c           H                    **   c              #
-#     H   ====                      =====           g     H                   ====                 #
+#     H   ====                      ===== m         g     H                   ====                 #
 #     H                                   XX              H                                   * *  #
 #* *  H                       z           XX              H     z                           X      #
 ##################TTT###  ######################TT####################   ###############TTT#########
