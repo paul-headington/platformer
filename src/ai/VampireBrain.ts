@@ -1,0 +1,220 @@
+import Phaser from 'phaser';
+import { TILE, VAMPIRE } from '../config';
+import { EMOTE, emote } from './emote';
+import type { ZombieWorld } from './ZombieBrain';
+
+type Sprite = Phaser.Physics.Arcade.Sprite;
+type Body = Phaser.Physics.Arcade.Body;
+type Mode = 'guard' | 'alert' | 'stalk' | 'windup' | 'lunge' | 'recover' | 'stunned' | 'return';
+
+/** Frames in the 'vampire' sheet (see tools/sprites.py). */
+export const VAMPIRE_FRAME = { stand: 0, crouch: 6, lunge: 7, hiss: 8, headless: 9 } as const;
+
+/**
+ * Drives the vampire that guards the exit. It stands at its post, looking about,
+ * until it sees the player on its floor. Then it hisses, and stalks them, but never
+ * further than its leash from the post and never off the edge of its floor. Close
+ * up it crouches (the warning) and lunges a few tiles, then stands a moment to
+ * recover: the time to cut it. A cut that doesn't kill it knocks it back. If it
+ * loses the player for a few seconds it walks back to its post.
+ */
+export class VampireBrain {
+  /** Read by the tile collider. A vampire never climbs. */
+  readonly climbing = false;
+  private mode: Mode = 'guard';
+  private dir = -1;
+  private until = 0;
+  private lastSeenAt = -Infinity;
+  private lungeFromX = 0;
+  private nextLookAt = 0;
+  private readonly postX: number;
+
+  constructor(
+    private readonly v: Sprite,
+    private readonly world: ZombieWorld,
+  ) {
+    this.postX = v.x;
+    this.face(-1);
+  }
+
+  private get body(): Body {
+    return this.v.body as Body;
+  }
+
+  update(time: number): void {
+    if (!this.v.active) return;
+    const sees = this.sees();
+    if (sees) this.lastSeenAt = time;
+    const fair = this.world.playerIsFair();
+
+    switch (this.mode) {
+      case 'guard':
+        this.stand(VAMPIRE_FRAME.stand, true);
+        if (sees) this.spot(time);
+        else if (time >= this.nextLookAt) {
+          // Glances the other way now and then, then back towards the way in.
+          this.face(this.dir === -1 && Math.random() < 0.5 ? 1 : -1);
+          this.nextLookAt = time + Phaser.Math.Between(1500, 3500);
+        }
+        break;
+      case 'return':
+        if (sees) this.spot(time);
+        else if (Math.abs(this.v.x - this.postX) < 2) {
+          this.mode = 'guard';
+          this.face(-1);
+        } else this.walk(Math.sign(this.postX - this.v.x), VAMPIRE.speed);
+        break;
+      case 'alert':
+        this.stand(VAMPIRE_FRAME.hiss);
+        this.facePlayer();
+        if (!fair) this.mode = 'return';
+        else if (time >= this.until) this.mode = 'stalk';
+        break;
+      case 'stalk':
+        this.stalk(time, fair);
+        break;
+      case 'windup':
+        this.stand(VAMPIRE_FRAME.crouch);
+        if (time >= this.until) {
+          this.mode = 'lunge';
+          this.lungeFromX = this.v.x;
+        }
+        break;
+      case 'lunge': {
+        const gone = Math.abs(this.v.x - this.lungeFromX) >= VAMPIRE.lungeDistance;
+        if (gone || !this.canStep(this.dir) || this.blocked(this.dir) || !this.inTerritory(this.v.x + this.dir * 4)) {
+          this.mode = 'recover';
+          this.until = time + VAMPIRE.lungeRecover;
+          this.stand(VAMPIRE_FRAME.stand, true);
+        } else {
+          this.v.anims.stop();
+          this.v.setFrame(VAMPIRE_FRAME.lunge).setVelocityX(this.dir * VAMPIRE.lungeSpeed);
+        }
+        break;
+      }
+      case 'recover':
+        this.stand(VAMPIRE_FRAME.stand, true);
+        if (time >= this.until) this.mode = 'stalk';
+        break;
+      case 'stunned': {
+        // Reeling back from a cut: slides to a stop, but not off its floor.
+        const vx = this.body.velocity.x * 0.88;
+        this.v.setVelocityX(this.canStep(Math.sign(vx)) ? vx : 0);
+        this.v.anims.stop();
+        this.v.setFrame(VAMPIRE_FRAME.hiss);
+        if (time >= this.until) this.mode = 'stalk';
+        break;
+      }
+    }
+  }
+
+  /** The player died or respawned: back to its post. Its wounds stay. */
+  forget(): void {
+    if (this.mode === 'stunned') return;
+    this.mode = 'return';
+    this.lastSeenAt = -Infinity;
+  }
+
+  /** Cut but not killed: reels back away from the blade, hissing. `from` is the side the cut came from. */
+  shot(time: number, from = -this.dir): void {
+    this.mode = 'stunned';
+    this.until = time + VAMPIRE.stunTime;
+    this.lastSeenAt = time;
+    this.face(from);
+    this.v.setVelocityX(-from * 170);
+  }
+
+  // ---------------------------------------------------------------- senses
+
+  /** Sees the player along its own floor, either way, if no wall is in between. */
+  private sees(): boolean {
+    if (!this.world.playerIsFair()) return false;
+    const p = this.world.player.body as Body;
+    const b = this.body;
+    const dx = p.center.x - b.center.x;
+    if (Math.abs(dx) > VAMPIRE.sight || Math.abs(p.bottom - b.bottom) > VAMPIRE.sightHeight) return false;
+    const eyeRow = Math.floor((b.top + 6) / TILE);
+    const x0 = Math.floor(b.center.x / TILE);
+    const x1 = Math.floor(p.center.x / TILE);
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) if (this.world.nav.isSolid(x, eyeRow)) return false;
+    return true;
+  }
+
+  private spot(time: number): void {
+    this.mode = 'alert';
+    this.until = time + VAMPIRE.alertTime;
+    this.facePlayer();
+    emote(this.v, this.body.top, EMOTE.spotted);
+  }
+
+  // ---------------------------------------------------------------- moving
+
+  private stalk(time: number, fair: boolean): void {
+    if (!fair || time - this.lastSeenAt > VAMPIRE.forgetAfter) {
+      if (fair) emote(this.v, this.body.top, EMOTE.lost);
+      this.mode = 'return';
+      return;
+    }
+    const p = this.world.player.body as Body;
+    const dx = p.center.x - this.body.center.x;
+    this.facePlayer();
+    const level = Math.abs(p.bottom - this.body.bottom) <= TILE;
+    if (level && Math.abs(dx) <= VAMPIRE.lungeRange && this.lastSeenAt === time) {
+      this.mode = 'windup';
+      this.until = time + VAMPIRE.lungeWindup;
+      this.stand(VAMPIRE_FRAME.crouch);
+      return;
+    }
+    // Follows the player's x, but only as far as its own patch.
+    const target = Phaser.Math.Clamp(p.center.x, this.postX - VAMPIRE.leash, this.postX + VAMPIRE.leash);
+    const dir = Math.sign(target - this.v.x);
+    if (Math.abs(target - this.v.x) < 3 || !this.canStep(dir) || this.blocked(dir)) this.stand(VAMPIRE_FRAME.hiss);
+    else this.walk(dir, VAMPIRE.stalkSpeed);
+  }
+
+  private walk(dir: number, speed: number): void {
+    if (!this.canStep(dir) || this.blocked(dir)) {
+      this.stand(VAMPIRE_FRAME.stand, true);
+      return;
+    }
+    this.face(dir);
+    this.v.setVelocityX(dir * speed);
+    this.v.anims.play('vampire-walk', true);
+  }
+
+  private stand(frame: number, idle = false): void {
+    this.v.setVelocityX(0);
+    if (idle) this.v.anims.play('vampire-idle', true);
+    else {
+      this.v.anims.stop();
+      this.v.setFrame(frame);
+    }
+  }
+
+  private face(dir: number): void {
+    if (dir === 0) return;
+    this.dir = dir;
+    this.v.setFlipX(dir < 0);
+  }
+
+  private facePlayer(): void {
+    this.face(Math.sign(this.world.player.x - this.v.x) || this.dir);
+  }
+
+  private inTerritory(x: number): boolean {
+    return Math.abs(x - this.postX) <= VAMPIRE.leash;
+  }
+
+  private blocked(dir: number): boolean {
+    return (dir < 0 && this.body.blocked.left) || (dir > 0 && this.body.blocked.right);
+  }
+
+  /** There is floor to stand on just ahead (it won't walk off a ledge or into a hole). */
+  private canStep(dir: number): boolean {
+    if (dir === 0) return true;
+    const b = this.body;
+    const x = Math.floor((b.center.x + dir * (b.halfWidth + 3)) / TILE);
+    const y = Math.floor((b.bottom - 1) / TILE);
+    return this.world.nav.isStandable(x, y);
+  }
+}
