@@ -12,6 +12,8 @@ export class HudScene extends Phaser.Scene {
   private weaponMark!: Phaser.GameObjects.Rectangle;
   private keyIcon!: Phaser.GameObjects.Image;
   private message!: Phaser.GameObjects.Text;
+  /** The touch USE button: only shown while there is something in reach to use. */
+  private useButton: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('Hud');
@@ -76,6 +78,12 @@ export class HudScene extends Phaser.Scene {
     this.weaponMark.setVisible(!!heldIcon && owned.length > 1);
     if (heldIcon) this.weaponMark.setPosition(heldIcon.x - heldIcon.displayWidth / 2, 6).setSize(heldIcon.displayWidth + 4, 11);
     this.keyIcon.setAlpha(this.registry.get(REG.hasKey) ? 1 : 0.15);
+    const canUse = !!this.registry.get(REG.canUse);
+    for (const part of this.useButton) {
+      (part as unknown as Phaser.GameObjects.Components.Visible).setVisible(canUse);
+      if (part.input) part.input.enabled = canUse;
+    }
+    if (!canUse) pad.release('use');
   }
 
   private showMessage(msg: HudMessage): void {
@@ -99,6 +107,8 @@ export class HudScene extends Phaser.Scene {
     const y = GAME_HEIGHT - 28;
     this.touchButton('fire', GAME_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'));
     this.touchButton('jump', GAME_WIDTH - 26, y, (x, by) => this.labelFor(x, by, 'JUMP'));
+    // USE sits above and between them, and only appears in front of something usable.
+    this.useButton = this.touchButton('use', GAME_WIDTH - 48, y - 42, (x, by) => this.labelFor(x, by, 'USE'), 14, { w: 36, h: 26 });
 
     // A tap away from the buttons restarts after winning or losing.
     this.input.on('pointerdown', (_p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
@@ -121,9 +131,10 @@ export class HudScene extends Phaser.Scene {
     icon: (x: number, y: number) => { setAlpha(value: number): unknown },
     radius = 17,
     area: { x?: number; y?: number; w?: number; h?: number } = {},
-  ): void {
+  ): Phaser.GameObjects.GameObject[] {
     const ring = this.add.circle(x, y, radius, 0xffffff, 0.12).setStrokeStyle(1, 0xffffff, 0.5);
-    icon(x, y).setAlpha(0.8);
+    const label = icon(x, y);
+    label.setAlpha(0.8);
     // The touch area is larger than the drawn button so it's easy to hit without looking.
     const zone = this.add.zone(area.x ?? x, area.y ?? y, area.w ?? 44, area.h ?? 56).setInteractive();
     const down = () => {
@@ -138,5 +149,6 @@ export class HudScene extends Phaser.Scene {
     zone.on('pointerover', (p: Phaser.Input.Pointer) => p.isDown && down()); // finger slid onto it
     zone.on('pointerup', up);
     zone.on('pointerout', up);
+    return [ring, label as unknown as Phaser.GameObjects.GameObject, zone];
   }
 }

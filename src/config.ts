@@ -218,5 +218,7 @@ export const REG = {
   /** Every WeaponId the player has picked up, in the order found. */
   weapons: 'weapons',
   hasKey: 'hasKey',
+  /** True while the player is in front of something they can use (a loose book): shows the USE button. */
+  canUse: 'canUse',
   message: 'message',
 } as const;

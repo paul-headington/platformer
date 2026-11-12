@@ -2,7 +2,7 @@
  * Shared state for the on-screen touch buttons. The HUD writes to it and the
  * game scene reads it alongside the keyboard, so both control schemes work at once.
  */
-export type PadButton = 'left' | 'right' | 'up' | 'down' | 'jump' | 'fire' | 'switch';
+export type PadButton = 'left' | 'right' | 'up' | 'down' | 'jump' | 'fire' | 'switch' | 'use';
 
 class VirtualPadState {
   private held = new Set<PadButton>();
