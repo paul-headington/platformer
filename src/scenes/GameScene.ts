@@ -144,8 +144,8 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
-  /** Whether the player has been told that bullets go straight through ghosts. */
-  private toldImmune = false;
+  /** Enemy types the player has already been told their shot can't hurt. */
+  private toldImmune = new Set<EnemyType>();
   private climbing = false;
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
@@ -163,7 +163,8 @@ export class GameScene extends Phaser.Scene {
     this.state = 'playing';
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
     this.invulnerableUntil = this.climbBlockedUntil = 0;
-    this.climbing = this.onStairs = this.toldImmune = false;
+    this.climbing = this.onStairs = false;
+    this.toldImmune.clear();
     this.traps = [];
     this.hatches = [];
     this.books = [];
@@ -909,7 +910,7 @@ export class GameScene extends Phaser.Scene {
     const touch = this.isTouch();
     if (id === 'shotgun') {
       const swap = touch ? 'Tap the guns up top' : 'Press C';
-      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost.\n${swap} to switch guns`);
+      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost,\nbut it bounces off zombies.\n${swap} to switch guns`);
     } else {
       this.say(`You found ${WEAPONS[id].name}!\n${touch ? 'Tap FIRE' : 'Press X'} to shoot`);
     }
@@ -966,24 +967,39 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * A shot from a weapon the enemy shrugs off goes straight through it. The enemy
-   * wavers so the player can see the shot landed and did nothing, and the first
-   * time it happens the player is told why.
+   * A shot from a weapon the enemy shrugs off. Bullets go straight through a ghost,
+   * which wavers so the player can see the shot landed and did nothing. Rock salt
+   * just bounces off a zombie and scatters on the floor. The first time each
+   * happens, the player is told why and which gun to use instead.
    */
   private passThrough(bullet: Sprite, enemy: Sprite): void {
     const passed = bullet.getData('passed') as Sprite[];
     if (passed.includes(enemy)) return;
     passed.push(enemy);
-    const alpha = enemy.alpha;
-    this.tweens.add({ targets: enemy, alpha: alpha * 0.35, duration: 70, yoyo: true, onComplete: () => enemy.setAlpha(alpha) });
-    if (!this.toldImmune && enemy.getData('type') === 'ghost') {
-      this.toldImmune = true;
-      const owned = this.registry.get(REG.weapons) as WeaponId[];
+    const type = enemy.getData('type') as EnemyType;
+    if (type === 'ghost') {
+      const alpha = enemy.alpha;
+      this.tweens.add({ targets: enemy, alpha: alpha * 0.35, duration: 70, yoyo: true, onComplete: () => enemy.setAlpha(alpha) });
+    } else {
+      const { x, y } = bullet;
+      const back = (bullet.body as Body).velocity.x > 0 ? -1 : 1;
+      bullet.destroy();
+      const grain = this.add.image(x, y, 'salt').setDepth(9);
+      this.tweens.add({ targets: grain, x: x + back * Phaser.Math.Between(6, 14), y: y + 10, alpha: 0, duration: 300, ease: 'Quad.in', onComplete: () => grain.destroy() });
+    }
+
+    if (this.toldImmune.has(type)) return;
+    this.toldImmune.add(type);
+    const owned = this.registry.get(REG.weapons) as WeaponId[];
+    const swap = this.isTouch() ? 'Tap the guns up top' : 'Press C';
+    if (type === 'ghost') {
       this.say(
         owned.includes('shotgun')
-          ? `Bullets go straight through ghosts!\n${this.isTouch() ? 'Tap the guns up top' : 'Press C'} for the rock salt`
+          ? `Bullets go straight through ghosts!\n${swap} for the rock salt`
           : 'Bullets go straight through ghosts!\nThere must be something else...',
       );
+    } else {
+      this.say(`Rock salt just bounces off zombies!\n${swap} for the gun`);
     }
   }
 

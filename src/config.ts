@@ -70,7 +70,8 @@ export const WEAPONS = {
     icon: 'gun',
   },
   /**
-   * The rock salt shotgun (S in the level text): the only thing that hurts a ghost.
+   * The rock salt shotgun (S in the level text): the only thing that hurts a ghost,
+   * and useless against zombies.
    * Three grains of salt in a fan that only carry six tiles, so it's best up close.
    */
   shotgun: {
@@ -126,8 +127,8 @@ export const ZOMBIE = {
   damage: 1,
   /** Points for killing one. */
   points: 200,
-  /** Any gun will do. Four grains of rock salt (two close blasts) also put one down. */
-  hurtBy: ['pistol', 'shotgun'],
+  /** Only bullets. The shotgun is loaded with rock salt, which just bounces off. */
+  hurtBy: ['pistol'],
   death: 'puff',
 
   // ---- Movement -------------------------------------------------------------
