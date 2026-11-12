@@ -8,6 +8,7 @@
  *   S  rock salt shotgun pickup (the only thing that hurts ghosts)
  *   m  machete pickup (cuts down zombies; the only thing that hurts a vampire)
  *   K  key (opens the exit door)     D  exit door
+ *   J  spare leather jacket: an extra life
  *   P  player start                  z  zombie (walks)
  *   g  ghost (floats; flies after the player, through any open space)
  *   V  vampire: guards its stretch of floor, and the exit door won't open
@@ -56,7 +57,8 @@
  * which haunts the far end of that room), east along the upstairs landing, up the
  * ladder to the top floor and west through the portrait gallery (past a zombie,
  * two trapdoors, a wall of crates and a ghost) to the ladder into the attic,
- * west along the attic for the key, then drop through the gap in the boards at
+ * west along the attic for the key (or first east, to the far end of the
+ * attic, for the spare leather jacket and an extra life), then drop through the gap in the boards at
  * its far west end into the nursery (walled off from the gallery, so it is only
  * reached this way), and on through the broken floor by the trapdoor down into
  * the west bedroom. Pull the loose book on its bookcase to open the secret
@@ -77,7 +79,7 @@ const MAP = String.raw`
       ##                    =====       g       ====              g         =====           ##      
     ##                           c                  ww          c                             ##    
   ##                  XX             X              ww    XXX                                   ##  
-##      K   *         XX      z     XX                    XXX                                     ##
+##      K   *         XX      z     XX                    XXX                                  J  ##
 ####  ######################################TTT###H###################TT############################
 #%                                     %#%        H                     #                         %#
 #                           v           #         H                     #               v          #

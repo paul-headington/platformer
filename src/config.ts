@@ -305,7 +305,7 @@ export type EnemyType = keyof typeof ENEMIES;
 export const ENEMY_HIT_FLASH = { tint: 0xffffff, duration: 120 };
 
 /** Points for pickups and finishing. Enemy points are in each enemy's block above. */
-export const SCORE = { gem: 100, key: 500, exit: 1000 };
+export const SCORE = { gem: 100, key: 500, jacket: 250, exit: 1000 };
 
 /** Registry keys shared between the game scene and the HUD. */
 export const REG = {

@@ -26,6 +26,7 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
     this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
     this.load.image('key', `key.png${v}`);
+    this.load.image('jacket', `jacket.png${v}`);
     this.load.image('gun', `gun.png${v}`);
     this.load.image('bullet', `bullet.png${v}`);
     this.load.image('shotgun', `shotgun.png${v}`);
