@@ -8,6 +8,9 @@
  * There is no jumping, so a player on a shelf is out of reach and the zombie can
  * only wait below them.
  *
+ * Floating enemies use findFlightPath() instead, which goes through any open
+ * tile but not through walls.
+ *
  * Nothing here knows about Phaser, so it can be tested on its own.
  */
 
@@ -28,6 +31,13 @@ export interface PathResult {
   /** False when the goal can't be reached and the path ends at the closest reachable cell instead. */
   reached: boolean;
 }
+
+/** The eight ways a floating enemy can move from one cell to the next. */
+const FLIGHT_DIRS: readonly [number, number][] = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1],
+];
 
 export class NavGrid {
   readonly width: number;
@@ -71,6 +81,11 @@ export class NavGrid {
   isStairs(x: number, y: number): boolean {
     const c = this.ch(x, y);
     return c === '/' || c === '\\';
+  }
+
+  /** Open air inside the map: anything but walls, floors and crates. Shelves, ladders and stairs don't stop a ghost. */
+  isOpen(x: number, y: number): boolean {
+    return this.open(x, y);
   }
 
   private open(x: number, y: number): boolean {
@@ -200,6 +215,64 @@ export class NavGrid {
     for (let i = best; i !== -1; i = prev[i]) {
       const x = i % w;
       path.push({ x, y: (i - x) / w, move: move[i] ?? 'walk' });
+    }
+    path.reverse();
+    return { path, reached: best === goal };
+  }
+
+  /**
+   * The shortest flight from `from` to `to` through open tiles, for floating
+   * enemies: eight directions, but never cutting the corner of a wall. If `to`
+   * can't be reached (or is more than `maxSteps` away), the route ends at the
+   * open cell nearest to it instead.
+   */
+  findFlightPath(from: Cell, to: Cell, maxSteps = Infinity): { path: Cell[]; reached: boolean } | null {
+    if (!this.open(from.x, from.y)) return null;
+    const w = this.width;
+    const start = from.y * w + from.x;
+    const goal = to.y * w + to.x;
+    const prev = new Int32Array(w * this.height).fill(-1);
+    const dist = new Int32Array(w * this.height).fill(-1);
+    dist[start] = 0;
+    const queue = [start];
+    let best = start;
+    let bestScore = Infinity;
+
+    for (let head = 0; head < queue.length; head++) {
+      const i = queue[head];
+      if (i === goal) {
+        best = i;
+        break;
+      }
+      const x = i % w;
+      const y = (i - x) / w;
+      const s = Math.hypot(x - to.x, y - to.y) + dist[i] * 0.01;
+      if (s < bestScore) {
+        bestScore = s;
+        best = i;
+      }
+      if (dist[i] >= maxSteps) continue;
+      // Of the many equally short routes, prefer the one that heads straight for the goal.
+      const dirs = FLIGHT_DIRS.slice().sort(
+        (a, b) => Math.hypot(x + a[0] - to.x, y + a[1] - to.y) - Math.hypot(x + b[0] - to.x, y + b[1] - to.y),
+      );
+      for (const [dx, dy] of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!this.open(nx, ny)) continue;
+        if (dx && dy && (!this.open(x + dx, y) || !this.open(x, y + dy))) continue;
+        const j = ny * w + nx;
+        if (dist[j] !== -1) continue;
+        dist[j] = dist[i] + 1;
+        prev[j] = i;
+        queue.push(j);
+      }
+    }
+
+    const path: Cell[] = [];
+    for (let i = best; i !== -1; i = prev[i]) {
+      const x = i % w;
+      path.push({ x, y: (i - x) / w });
     }
     path.reverse();
     return { path, reached: best === goal };

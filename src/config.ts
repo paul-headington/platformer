@@ -42,7 +42,23 @@ export const ZOMBIE = {
   /** Re-plans its route at least this often (ms). */
   replanEvery: 300,
 };
-export const GHOST = { speed: 28, range: 48, bob: 6 };
+export const GHOST = {
+  /** Drifting back and forth over its haunt: speed, how far each way, and the up-and-down bob (px). */
+  speed: 28,
+  range: 48,
+  bob: 6,
+  /** Chasing speed. Slower than a zombie, because a ghost flies straight over crates and up to shelves. */
+  chaseSpeed: 40,
+  /** Speed floating home after it gives up. */
+  returnSpeed: 30,
+  /** Sees the player this far away in any direction, if no wall is in the way (px). */
+  sight: 7 * TILE,
+  alertTime: 600,
+  forgetAfter: 3000,
+  /** Won't chase further than this from its haunt; it gives up and floats home (px). */
+  leash: 14 * TILE,
+  replanEvery: 250,
+};
 
 export const SCORE = { gem: 100, enemy: 200, key: 500, exit: 1000 };
 

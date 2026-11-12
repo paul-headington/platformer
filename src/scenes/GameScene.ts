@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
+import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
-import { BULLET, CAMERA, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE } from '../config';
+import { BULLET, CAMERA, GAME_HEIGHT, GAME_WIDTH, PLAYER, REG, SCORE, TILE } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -212,7 +213,7 @@ export class GameScene extends Phaser.Scene {
           case 'g': {
             const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
             (gh.body as Body).setSize(12, 12).setOffset(4, 3);
-            gh.setData({ ox: cx, oy: cy, phase: tx }).setAlpha(0.85).play('ghost-float');
+            gh.setData({ phase: tx }).setAlpha(0.85).play('ghost-float');
             break;
           }
         }
@@ -231,6 +232,7 @@ export class GameScene extends Phaser.Scene {
       stairSurface: (body, maxDrop) => this.stairSurface(body, maxDrop),
     };
     for (const z of this.zombies.getChildren() as Sprite[]) z.setData('brain', new ZombieBrain(z, world));
+    for (const g of this.ghosts.getChildren() as Sprite[]) g.setData('brain', new GhostBrain(g, world, g.getData('phase')));
 
     // Open bottom edge so falling into a pit is possible.
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
@@ -569,8 +571,8 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- loop
 
-  update(time: number): void {
-    this.updateEnemies(time);
+  update(time: number, delta: number): void {
+    this.updateEnemies(time, delta);
     this.cullBullets();
 
     if (this.state === 'won' || this.state === 'over') {
@@ -777,15 +779,10 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private updateEnemies(time: number): void {
+  private updateEnemies(time: number, delta: number): void {
     for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).update(time);
 
-    for (const g of this.ghosts.getChildren() as Sprite[]) {
-      const t = time / 1000 + (g.getData('phase') as number);
-      const sway = (GHOST.speed / GHOST.range) * t;
-      g.setPosition(g.getData('ox') + Math.sin(sway) * GHOST.range, g.getData('oy') + Math.sin(t * 2.5) * GHOST.bob);
-      g.setFlipX(Math.cos(sway) < 0);
-    }
+    for (const g of this.ghosts.getChildren() as Sprite[]) (g.getData('brain') as GhostBrain).update(time, delta);
   }
 
   // ---------------------------------------------------------------- trapdoors
@@ -878,6 +875,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setCrop().clearTint().setPosition(this.spawn.x, this.spawn.y).setVelocity(0, 0);
     this.invulnerableUntil = this.time.now + PLAYER.invulnerableAfterRespawn;
     for (const z of this.zombies.getChildren() as Sprite[]) (z.getData('brain') as ZombieBrain).forget();
+    for (const g of this.ghosts.getChildren() as Sprite[]) (g.getData('brain') as GhostBrain).forget();
     this.tweens.add({ targets: this.player, alpha: 0.3, duration: 100, yoyo: true, repeat: 6, onComplete: () => this.player.setAlpha(1) });
     pad.clearPresses();
     this.state = 'playing';

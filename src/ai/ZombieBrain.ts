@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE, ZOMBIE } from '../config';
+import { EMOTE, emote } from './emote';
 import type { Cell, NavGrid, Step } from './NavGrid';
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
@@ -17,8 +18,6 @@ export interface ZombieWorld {
   stairSurface(body: Body, maxDrop: number): number | null;
 }
 
-/** Frames in the 'emote' sheet. */
-const EMOTE = { spotted: 0, lost: 1 } as const;
 const STAND_FRAME = 3;
 const STEP_DOWN = 8;
 
@@ -139,10 +138,7 @@ export class ZombieBrain {
   }
 
   private emote(frame: number): void {
-    const scene = this.z.scene;
-    const e = scene.add.image(this.z.x, this.body.top - 6, 'emote', frame).setDepth(11);
-    scene.tweens.add({ targets: e, y: e.y - 5, duration: 250, ease: 'Back.out' });
-    scene.tweens.add({ targets: e, alpha: 0, delay: 700, duration: 250, onComplete: () => e.destroy() });
+    emote(this.z, this.body.top, frame);
   }
 
   // ---------------------------------------------------------------- where am I
