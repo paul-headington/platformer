@@ -18,13 +18,14 @@ PALETTE = {
     'w': (255, 255, 255),
     's': (242, 194, 139),  # skin
     'S': (201, 143, 94),   # skin shade
-    'h': (214, 42, 48),    # cap
-    'H': (140, 20, 32),    # cap shade / brim
-    'i': (255, 118, 104),  # cap highlight
-    'n': (92, 60, 40),     # hair
-    'j': (232, 118, 45),   # jacket
-    'J': (169, 76, 26),    # jacket shade
-    'l': (255, 176, 102),  # jacket zip / highlight
+    'n': (92, 60, 40),     # zombie hair
+    'z': (46, 34, 30),     # hunter's short dark hair
+    'Z': (82, 62, 50),     # hair highlight
+    'j': (140, 90, 54),    # worn brown leather jacket
+    'J': (96, 60, 38),     # leather shade
+    'l': (184, 128, 80),   # scuffed leather highlight / lapel
+    'f': (176, 46, 46),    # plaid flannel shirt
+    'F': (74, 30, 36),     # flannel dark check
     'p': (59, 74, 122),    # jeans
     'P': (40, 51, 87),     # jeans shade
     'b': (90, 58, 36),     # boots
@@ -55,65 +56,65 @@ PALETTE = {
 # drawn facing right; Phaser flips them for walking left.
 
 HEAD = """
-...kkkkkk......
-..khhhiihk.....
-.khhhhhhihk....
-.khhhhhhhhhkkk.
-kHHHHHHHHHHHHHk
-.knnssssssk.
-.knssswksk..
-.knssssssssk
-..ksssssSsk.
+............
+...kkkkkk...
+..kzzzzZzkk.
+.kzzzzzzZzZk
+.kzzzzzzzzzk
+.kzzzssszzsk
+.kzSsssswksk
+.kzSsssssssk
+..kssSsSSsk.
 ...kSSSSSk..
 """
 
 BODY_IDLE = """
 ....kkkkkk....
-...kjjjjljk...
-..kJjjjjljjk..
-..kJjjjjljjk..
-..kJjjjjljjk..
-..ksJjjjljsk..
+...kjlfFljk...
+..kJjjfFfjjk..
+..kJjjFfFjjk..
+..kJjjfFfjjk..
+..ksJjFfFjsk..
 ...kkkkkkkk...
 """
 
 BODY_RUN_A = """
 ....kkkkkk....
-...kjjjjljk...
-..kJjjjjljjkk.
-.kkJjjjjljjjsk
-ksJJjjjjljkkk.
-.kkJjjjjljk...
+...kjlfFljk...
+..kJjjfFfjjkk.
+.kkJjjFfFjjjsk
+ksJJjjfFfjkkk.
+.kkJjjFfFjk...
 ...kkkkkkkk...
 """
 
 BODY_RUN_B = """
 ....kkkkkk....
-...kjjjjljk...
-..kJjjjjljjk..
-kskJjjjjljjkk.
-.kkJjjjjljjjsk
-..kJjjjjljkk..
+...kjlfFljk...
+..kJjjfFfjjk..
+kskJjjFfFjjkk.
+.kkJjjfFfjjjsk
+..kJjjFfFjkk..
 ...kkkkkkkk...
 """
 
 BODY_JUMP = """
 ....kkkkkk.ks.
-...kjjjjljkjk.
-..kJjjjjljjjk.
-..kJjjjjljjk..
-.ksJjjjjljjk..
-..kJjjjjljjk..
+...kjlfFljkjk.
+..kJjjfFfjjjk.
+..kJjjFfFjjk..
+.ksJjjfFfjjk..
+..kJjjFfFjjk..
 ...kkkkkkkk...
 """
 
 BODY_ARMS_UP = """
 .ks.kkkkkk.ks.
-.kjkjjjjljkjk.
-..kJjjjjljjk..
-..kJjjjjljjk..
-..kJjjjjljjk..
-..kJjjjjljjk..
+.kjkjlfFljkjk.
+..kJjjfFfjjk..
+..kJjjFfFjjk..
+..kJjjfFfjjk..
+..kJjjFfFjjk..
 ...kkkkkkkk...
 """
 
@@ -165,15 +166,15 @@ LEGS_DANGLE = """
 """
 
 HEAD_BACK = """
+............
 ...kkkkkk...
-..khhhiihk..
-.khhhhhhihhk
-.khhhkkhhhhk
-kHHHknnkHHHk
-.knnnnnnnnk.
-.knnnnnnnnk.
-.knnnnnnnnk.
-..knnnnnnk..
+..kzzzZzzk..
+.kzzZzzzzzk.
+.kzzzzzzZzk.
+.kzzzzzzzzk.
+.kSzzzzzzSk.
+.kSzzzzzzSk.
+..kzzzzzzk..
 ...kSSSSk...
 """
 
@@ -203,21 +204,21 @@ LEGS_CLIMB = """
 # (GUN_IN_HAND is stamped on top, level with the bullet's spawn point).
 BODY_AIM = """
 ....kkkkkk....
-...kjjjjljk...
-..kJjjjjljjkkk
-..kJjjjjljjjjk
-..kJjjjjljkkk.
-..ksJjjjljk...
+...kjlfFljk...
+..kJjjfFfjjkkk
+..kJjjFfFjjjjk
+..kJjjfFfjkkk.
+..ksJjFfFjk...
 ...kkkkkkkk...
 """
 
 BODY_AIM_RUN = """
 ....kkkkkk....
-...kjjjjljk...
-..kJjjjjljjkkk
-.kkJjjjjljjjjk
-ksJJjjjjljkkk.
-.kkJjjjjljk...
+...kjlfFljk...
+..kJjjfFfjjkkk
+.kkJjjFfFjjjjk
+ksJJjjfFfjkkk.
+.kkJjjFfFjk...
 ...kkkkkkkk...
 """
 
