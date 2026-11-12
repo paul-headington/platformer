@@ -46,7 +46,7 @@ npm run desktop:dist    # make an installer for the current OS into release/
 ## Layout
 
 - `src/main.ts`: game config (320x200 resolution scaled up with crisp pixels, arcade physics).
-- `src/config.ts`: shared constants such as tile size and player speed.
+- `src/config.ts`: shared constants such as tile size and player speed. Enemy tuning (speed, sight, chase range, hits to kill, damage, points) is in the `ZOMBIE` and `GHOST` blocks.
 - `src/levels/level1.ts`: the level, drawn as text with one character per tile. Edit it to change the layout; the legend is at the top of the file.
 - `src/scenes/BootScene.ts`: loads the sprite sheets (characters, house tiles, wallpaper, decorations, night sky) and sets up animations.
 - `tools/sprites.py`: all the art (characters, pickups, house tiles, wallpaper, decorations and the night sky), drawn as text pixel maps. Edit a map, run `python3 tools/sprites.py --preview` (needs Pillow), and it rewrites `public/sprites/*.png` and `docs/sprite-preview.png`.

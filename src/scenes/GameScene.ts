@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
-import { BULLET, CAMERA, GAME_HEIGHT, GAME_WIDTH, PLAYER, REG, SCORE, TILE } from '../config';
+import { BULLET, CAMERA, ENEMY_HIT_FLASH, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -42,6 +42,9 @@ const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase:
 const STEP_UP = 10;
 const STEP_DOWN = 8;
 /** Player sheet frames (see tools/sprites.py). */
+/** The combat numbers every enemy type has in config.ts. */
+type EnemyStats = { hits: number; damage: number; points: number };
+
 const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
 /** The armed poses sit this many frames after the unarmed ones. */
 const PLAYER_GUN_OFFSET = 10;
@@ -207,13 +210,13 @@ export class GameScene extends Phaser.Scene {
           case 'z': {
             const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
             (z.body as Body).setSize(8, 21).setOffset(6, 3);
-            z.play('zombie-walk');
+            z.setData({ stats: ZOMBIE, hp: ZOMBIE.hits }).play('zombie-walk');
             break;
           }
           case 'g': {
             const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
             (gh.body as Body).setSize(12, 12).setOffset(4, 3);
-            gh.setData({ phase: tx }).setAlpha(0.85).play('ghost-float');
+            gh.setData({ phase: tx, stats: GHOST, hp: GHOST.hits }).setAlpha(0.85).play('ghost-float');
             break;
           }
         }
@@ -256,8 +259,9 @@ export class GameScene extends Phaser.Scene {
       (_b, t) => SOLID.has((t as Phaser.Tilemaps.Tile).index),
     );
 
-    this.physics.add.overlap(this.player, this.zombies, () => this.hurt());
-    this.physics.add.overlap(this.player, this.ghosts, () => this.hurt());
+    this.physics.add.overlap(this.player, [this.zombies, this.ghosts], (_p, e) =>
+      this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
+    );
     this.physics.add.overlap(this.player, gems, (_p, g) => {
       (g as Phaser.Physics.Arcade.Image).destroy();
       this.addScore(SCORE.gem);
@@ -281,7 +285,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.door, () => this.reachDoor());
     this.physics.add.overlap(this.bullets, [this.zombies, this.ghosts], (b, e) => {
       (b as Sprite).destroy();
-      this.killEnemy(e as Sprite);
+      this.shootEnemy(e as Sprite);
     });
   }
 
@@ -845,9 +849,9 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- events
 
   /** Takes a life, stops the player in their tracks and returns how many lives are left. */
-  private loseLife(): number {
+  private loseLife(count = 1): number {
     this.state = 'dying';
-    const lives = (this.registry.get(REG.lives) as number) - 1;
+    const lives = Math.max(0, (this.registry.get(REG.lives) as number) - count);
     this.registry.set(REG.lives, lives);
     if (this.climbing) this.stopClimbing();
     this.onStairs = false;
@@ -855,11 +859,12 @@ export class GameScene extends Phaser.Scene {
     return lives;
   }
 
-  private hurt(force = false): void {
+  /** The player is caught (by an enemy, taking `damage` lives) or falls to their death (`force`). */
+  private hurt(force = false, damage = 1): void {
     if (this.state !== 'playing') return;
     if (!force && this.time.now < this.invulnerableUntil) return;
 
-    const lives = this.loseLife();
+    const lives = this.loseLife(damage);
     this.player.anims.stop();
     this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
     this.cameras.main.shake(150, 0.01);
@@ -902,9 +907,22 @@ export class GameScene extends Phaser.Scene {
     this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\n${this.isTouch() ? 'Tap' : 'Press Enter'} to play again`, true);
   }
 
-  private killEnemy(enemy: Sprite): void {
+  /** A bullet hits an enemy: it dies once it has taken its `hits`, otherwise it flashes and turns on the player. */
+  private shootEnemy(enemy: Sprite): void {
     if (!enemy.active) return;
-    this.addScore(SCORE.enemy);
+    const hp = (enemy.getData('hp') as number) - 1;
+    enemy.setData('hp', hp);
+    if (hp > 0) {
+      enemy.setTint(ENEMY_HIT_FLASH.tint).setTintMode(Phaser.TintModes.FILL);
+      this.time.delayedCall(ENEMY_HIT_FLASH.duration, () => enemy.active && enemy.clearTint().setTintMode(Phaser.TintModes.MULTIPLY));
+      (enemy.getData('brain') as ZombieBrain | GhostBrain).shot(this.time.now);
+      return;
+    }
+    this.killEnemy(enemy);
+  }
+
+  private killEnemy(enemy: Sprite): void {
+    this.addScore((enemy.getData('stats') as EnemyStats).points);
     const puff = this.add.image(enemy.x, enemy.y, enemy.texture.key, 0).setFlipX(enemy.flipX);
     enemy.destroy();
     this.tweens.add({ targets: puff, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => puff.destroy() });

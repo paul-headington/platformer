@@ -47,7 +47,7 @@ export class GhostBrain {
   ) {
     this.homeX = this.x = g.x;
     this.homeY = this.y = g.y;
-    this.bob = phase * 2.5;
+    this.bob = phase * GHOST.bobSpeed;
   }
 
   update(time: number, delta: number): void {
@@ -79,7 +79,7 @@ export class GhostBrain {
     }
 
     // A slow bob, whatever it is doing.
-    this.bob += dt * 2.5;
+    this.bob += dt * GHOST.bobSpeed;
     this.g.setPosition(this.x, this.y + Math.sin(this.bob) * GHOST.bob);
   }
 
@@ -90,6 +90,15 @@ export class GhostBrain {
     this.path = [];
     this.plannedAt = -Infinity;
     this.lastSeenAt = -Infinity;
+  }
+
+  /** Shot but not killed: if it wasn't after the player already, it is now (if they are within its leash). */
+  shot(time: number): void {
+    this.lastSeenAt = time;
+    if (this.mode === 'haunt' || this.mode === 'return') {
+      const p = this.world.player;
+      if (this.world.playerIsFair() && Math.hypot(p.x - this.homeX, p.y - this.homeY) <= GHOST.leash) this.spot(time);
+    }
   }
 
   // ---------------------------------------------------------------- senses
