@@ -75,6 +75,14 @@ const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
 export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 18, machete: 26 };
 /** A machete swing: the blade goes up, then comes down (frames in the player sheet). */
 const MACHETE_SWING = { raise: 34, strike: 35 } as const;
+/** Zombie sheet frames (see tools/sprites.py). */
+const ZOMBIE_FRAME = { hit: 6, burst: 7, headless: 8 } as const;
+/** A pistol headshot: when the head bursts after the hit (ms), and how many bits fly off. */
+const ZOMBIE_HEADSHOT = { burstAt: 90, bits: 10 } as const;
+/** How long a headless zombie lies on the floor before fading, and how long the fade takes (ms). */
+const ZOMBIE_CORPSE = { lie: 1400, fade: 500 } as const;
+/** Gore sheet frames. */
+const GORE = { skin: 0, scalp: 1, eye: 2, goo: 3, tooth: 4 } as const;
 /** How long a burning ghost takes to burn away (ms); the flames take a little longer to die down. */
 const BURN_TIME = 900;
 
@@ -388,7 +396,7 @@ export class GameScene extends Phaser.Scene {
       }
       const from = Math.sign((bullet.body as Body).velocity.x) || 1;
       bullet.destroy();
-      this.shootEnemy(enemy, WEAPONS[weapon].damage, -from);
+      this.shootEnemy(enemy, WEAPONS[weapon].damage, -from, weapon);
     });
   }
 
@@ -1013,7 +1021,7 @@ export class GameScene extends Phaser.Scene {
           const eb = enemy.body as Body;
           if (!Phaser.Geom.Intersects.RectangleToRectangle(hitbox, new Phaser.Geom.Rectangle(eb.x, eb.y, eb.width, eb.height))) continue;
           if (!(enemy.getData('stats') as EnemyStats).hurtBy.includes(id)) this.passThrough(enemy, id);
-          else this.shootEnemy(enemy, blade.damage, dir < 0 ? 1 : -1);
+          else this.shootEnemy(enemy, blade.damage, dir < 0 ? 1 : -1, id);
         }
       }
     });
@@ -1296,8 +1304,11 @@ export class GameScene extends Phaser.Scene {
     return enemy.setData({ type, stats, health: stats.health });
   }
 
-  /** A shot takes `damage` off an enemy's health: at 0 it dies, otherwise it flashes and turns on the player. */
-  private shootEnemy(enemy: Sprite, damage: number, from = 0): void {
+  /**
+   * A shot takes `damage` off an enemy's health: at 0 it dies, otherwise it flashes and turns on the player.
+   * `from` is the side (-1 left, 1 right) the shot came from, `weapon` what it was fired from.
+   */
+  private shootEnemy(enemy: Sprite, damage: number, from = 0, weapon?: WeaponId): void {
     if (!enemy.active) return;
     const health = (enemy.getData('health') as number) - damage;
     enemy.setData('health', health);
@@ -1309,14 +1320,18 @@ export class GameScene extends Phaser.Scene {
       else brain.shot(this.time.now);
       return;
     }
-    this.killEnemy(enemy, from);
+    this.killEnemy(enemy, from, weapon);
   }
 
-  private killEnemy(enemy: Sprite, from = 0): void {
+  private killEnemy(enemy: Sprite, from = 0, weapon?: WeaponId): void {
     const stats = enemy.getData('stats') as EnemyStats;
     this.addScore(stats.points);
     if (stats.death === 'behead') {
       this.behead(enemy, from);
+      return;
+    }
+    if (stats.death === 'headshot') {
+      this.blowHeadOff(enemy, from, weapon !== undefined && !!(WEAPONS[weapon] as WeaponStats).melee);
       return;
     }
     const body = this.add.image(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
@@ -1370,6 +1385,83 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: body, angle: -away * 6, duration: 300, yoyo: true, delay: 150 });
     this.time.delayedCall(700, () => this.crumble(body, feet, 700));
     this.time.delayedCall(900, () => this.say('The vampire crumbles to dust!\nThe way out is clear.'));
+  }
+
+  /**
+   * A zombie's head comes off. A bullet bursts it in a spray of goo, scalp, teeth and
+   * an eyeball; a machete (`cut`) sends it flying whole. Either way the headless body
+   * stands a moment pumping goo, its knees go, it falls flat on its back and fades.
+   * `from` is the side the shot came from: the zombie turns to face it and everything
+   * flies the other way.
+   */
+  private blowHeadOff(enemy: Sprite, from: number, cut: boolean): void {
+    const feet = (enemy.body as Body).bottom;
+    const flip = from ? from < 0 : enemy.flipX;
+    const away = flip ? 1 : -1;
+    const { x } = enemy;
+    const neckY = feet - 15;
+    enemy.destroy();
+
+    const body = this.add.sprite(x, feet, 'zombie', ZOMBIE_FRAME.hit).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
+    body.play(cut ? 'zombie-headless' : 'zombie-headshot');
+    body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.tweens.add({ targets: body, alpha: 0, delay: ZOMBIE_CORPSE.lie, duration: ZOMBIE_CORPSE.fade, onComplete: () => body.destroy() });
+    });
+
+    if (cut) {
+      // The head flies off whole, spinning, and rolls to a stop.
+      const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setFlipX(flip).setDepth(6);
+      const landX = x + away * 28;
+      this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 600, ease: 'Linear' });
+      this.tweens.chain({
+        targets: head,
+        tweens: [
+          { y: head.y - 14, duration: 220, ease: 'Quad.out' },
+          { y: feet - 4, duration: 380, ease: 'Quad.in' },
+          { y: feet - 7, duration: 110, ease: 'Quad.out', yoyo: true },
+          { x: landX + away * 8, angle: away * 720, duration: 280, ease: 'Quad.out' },
+        ],
+        onComplete: () => this.tweens.add({
+          targets: head, alpha: 0, delay: ZOMBIE_CORPSE.lie, duration: ZOMBIE_CORPSE.fade, onComplete: () => head.destroy(),
+        }),
+      });
+      this.splatter(x, neckY, feet, away, 6, [GORE.goo]);
+      return;
+    }
+
+    // The head bursts a moment after the bullet lands (frame 6 is the hit, frame 7 the burst).
+    this.time.delayedCall(ZOMBIE_HEADSHOT.burstAt, () => {
+      this.cameras.main.shake(90, 0.004);
+      this.splatter(x, neckY - 4, feet, away, ZOMBIE_HEADSHOT.bits,
+        [GORE.skin, GORE.skin, GORE.scalp, GORE.goo, GORE.goo, GORE.tooth], true);
+    });
+  }
+
+  /**
+   * Throws `n` bits of gore up and away from (x, y): they arc over, land on the floor at
+   * `floor`, and fade. `eye` adds one eyeball that bounces.
+   */
+  private splatter(x: number, y: number, floor: number, away: number, n: number, bits: number[], eye = false): void {
+    const throwBit = (frame: number, spread: number, rise: number, bounce: boolean) => {
+      const bit = this.add.image(x + Phaser.Math.Between(-3, 3), y + Phaser.Math.Between(-2, 2), 'gore', frame).setDepth(7);
+      const landX = bit.x + away * Phaser.Math.Between(spread / 3, spread) + Phaser.Math.Between(-4, 4);
+      const up = Phaser.Math.Between(4, rise);
+      const fall = Phaser.Math.Between(320, 520);
+      this.tweens.add({ targets: bit, x: landX, angle: away * Phaser.Math.Between(90, 360), duration: 180 + fall, ease: 'Linear' });
+      this.tweens.chain({
+        targets: bit,
+        tweens: [
+          { y: bit.y - up, duration: 180, ease: 'Quad.out' },
+          { y: floor - 2, duration: fall, ease: 'Quad.in' },
+          ...(bounce ? [{ y: floor - 6, duration: 100, ease: 'Quad.out', yoyo: true }, { x: landX + away * 6, duration: 240, ease: 'Quad.out' }] : []),
+        ],
+        onComplete: () => this.tweens.add({
+          targets: bit, alpha: 0, delay: ZOMBIE_CORPSE.lie, duration: ZOMBIE_CORPSE.fade, onComplete: () => bit.destroy(),
+        }),
+      });
+    };
+    for (let i = 0; i < n; i++) throwBit(bits[i % bits.length], 26, 18, false);
+    if (eye) throwBit(GORE.eye, 34, 22, true);
   }
 
   /** Greys out, sinks into a heap and blows away as ash. */

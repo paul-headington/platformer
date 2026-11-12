@@ -20,6 +20,8 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('zombie', `zombie.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.image('vampire-head', `vampire-head.png${v}`);
+    this.load.image('zombie-head', `zombie-head.png${v}`);
+    this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
     this.load.image('machete', `machete.png${v}`);
     this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
     this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
@@ -68,6 +70,10 @@ export class BootScene extends Phaser.Scene {
     }
     this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
     this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
+    // Head blown off by a bullet: hit, burst, stand pumping goo, sway, knees go, flat on its back.
+    // A machete cut skips the hit and burst: the head flies off whole.
+    this.anims.create({ key: 'zombie-headshot', frames: frames('zombie', [6, 7, 7, 8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
+    this.anims.create({ key: 'zombie-headless', frames: frames('zombie', [8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
     this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
     this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });

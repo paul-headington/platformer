@@ -61,6 +61,11 @@ PALETTE = {
     'd': (60, 58, 80),     # black jeans
     'D': (32, 30, 44),     # jeans shade
     'K': (122, 92, 62),    # machete grip (wrapped cord)
+    # Zombie gore: cartoony green goo rather than blood, with a little bone.
+    'O': (170, 222, 74),   # bright goo
+    'U': (78, 120, 40),    # dark goo
+    'N': (112, 28, 40),    # raw neck
+    'W': (232, 228, 204),  # bone / teeth
 }
 
 # ---------------------------------------------------------------- characters
@@ -438,7 +443,105 @@ def zombie_climb_pose(flip):
     return [(legs, 3, 17), (body, 3, 10), (ZOMBIE_HEAD_BACK, 4, 0)]
 
 
+# ---- Headshot: the zombie's head is blown clean off.
+# The bullet lands: the head snaps back and cracks, goo bursting out of the front.
+ZOMBIE_HEAD_HIT = """
+..knkkkkk....
+.knngggggkO..
+.knggggOggkOO
+.kGggggkOOO.O
+.kGGggggOgUk.
+.kGgggkwkUO.O
+..kGggkkkk...
+..kGGgggGk...
+...kkkkkk....
+"""
+
+# The head bursts in a spray of goo, hair, bone and one red eye.
+ZOMBIE_HEAD_BURST = """
+...O...U...O....
+.O...UnOn.U...O.
+....UOOnOOOU....
+..UOOOOWOOOOU..O
+O.UOOOrOOOOOOU..
+..UOOOOOOWOOU...
+.O.UUOOOOOUU..O.
+...O..UOOU...O..
+.......NN.......
+"""
+
+# Where the head was, with goo pumping out (tall, short, done).
+ZOMBIE_STUMP = [
+    """
+.O..O.
+..OO..
+.O.O..
+..OO..
+.kkkk.
+kNUUNk
+.kkkk.
+""",
+    """
+......
+......
+..O.O.
+..OO..
+.kkkk.
+kNUUNk
+.kkkk.
+""",
+    """
+......
+......
+......
+......
+.kkkk.
+kNUUNk
+.kkkk.
+""",
+]
+
+# Arms dropped: nothing left to lurch after.
+ZOMBIE_BODY_LIMP = (BODY_IDLE.replace('j', 'c').replace('J', 'C').replace('l', 'c')
+                    .replace('f', 'c').replace('F', 'c').replace('s', 'g'))
+
+# Flat on its back, fallen away from the shot: neck to the left, a boot in the air.
+ZOMBIE_FALLEN = """
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+.....kk.........kk..
+.....kgk.......kbbk.
+.kk.kkgkkkkkkkkkbbk.
+kNUkcCcccccctttTTkk.
+UOUkkkkkkkkkkkkkkk..
+"""
+
+
+def zombie_headless(dy, body, legs, spurt, legs_y=17, x=3):
+    return [(trousers(legs), 3, legs_y), (body, x, 10 + dy), (ZOMBIE_STUMP[spurt], x + 4, 4 + dy)]
+
+
 # Frames 0-3: lurching walk. 4-5: climbing a ladder, seen from behind.
+# 6-11: headshot death. 6 hit, 7 head bursts, 8-9 headless body stands and sways,
+# 10 knees go, 11 flat on its back. A machete cut skips 6-7: the head flies off
+# whole (the 'zombie-head' image) and the body plays 8-11.
 ZOMBIE = [
     zombie_pose(1, ZOMBIE_BODY_A, LEGS_STRIDE),
     zombie_pose(0, ZOMBIE_BODY_B, LEGS_PASS),
@@ -446,7 +549,42 @@ ZOMBIE = [
     zombie_pose(0, ZOMBIE_BODY_B, LEGS_STAND),
     zombie_climb_pose(False),
     zombie_climb_pose(True),
+    [(trousers(LEGS_STAND), 3, 17), (ZOMBIE_BODY_A, 3, 10), (ZOMBIE_HEAD_HIT, 4, 0)],
+    [(trousers(LEGS_STAND), 3, 17), (ZOMBIE_BODY_A, 3, 10), (ZOMBIE_HEAD_BURST, 2, 0)],
+    zombie_headless(0, ZOMBIE_BODY_A, LEGS_STAND, 0),
+    zombie_headless(0, ZOMBIE_BODY_LIMP, LEGS_STRIDE, 1, x=2),
+    zombie_headless(3, ZOMBIE_BODY_LIMP, LEGS_TUCK, 2, legs_y=19, x=2),
+    [(ZOMBIE_FALLEN, 0, 0)],
 ]
+ZOMBIE_HEAD_ONLY = [ZOMBIE_HEAD]
+
+# Bits of zombie that fly off in a headshot: 0 skin, 1 scalp, 2 eyeball, 3 goo, 4 tooth.
+GORE = ["""
+.kk.
+kggk
+kGgk
+.kk.
+""", """
+.kk.
+knnk
+kgGk
+.kk.
+""", """
+.kk.
+kwrk
+kwwk
+.kk.
+""", """
+....
+.OO.
+.OU.
+....
+""", """
+....
+.WW.
+.Wk.
+....
+"""]
 
 GHOST_TOP = """
 .......kkkkk........
@@ -1609,6 +1747,7 @@ SHEETS = {
     'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
     'shotgun': SHOTGUN, 'salt': SALT, 'emote': EMOTE,
     'vampire': VAMPIRE, 'vampire-head': VAMPIRE_HEAD, 'machete': MACHETE,
+    'zombie-head': ZOMBIE_HEAD_ONLY, 'gore': GORE,
 }
 
 

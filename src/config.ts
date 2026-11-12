@@ -150,8 +150,11 @@ export interface EnemyStats {
   points: number;
   /** The weapons that can hurt it. Shots from any other weapon pass straight through. */
   hurtBy: readonly WeaponId[];
-  /** How it dies: 'puff' squashes flat and fades, 'burn' goes up in flames, 'behead' loses its head and crumbles to dust. */
-  death: 'puff' | 'burn' | 'behead';
+  /**
+   * How it dies: 'puff' squashes flat and fades, 'burn' goes up in flames, 'behead' loses its head and
+   * crumbles to dust, 'headshot' has its head blown off by a bullet (or cut off by a blade) and falls down.
+   */
+  death: 'puff' | 'burn' | 'behead' | 'headshot';
 }
 
 /** Zombies (z in the level text): walk the floors, take stairs and ladders, can't jump. */
@@ -165,7 +168,7 @@ export const ZOMBIE = {
   points: 200,
   /** Bullets and the machete. The shotgun is loaded with rock salt, which just bounces off. */
   hurtBy: ['pistol', 'machete'],
-  death: 'puff',
+  death: 'headshot',
 
   // ---- Movement -------------------------------------------------------------
   /** Wandering speed. */
