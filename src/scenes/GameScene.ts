@@ -1106,7 +1106,13 @@ export class GameScene extends Phaser.Scene {
       );
       this.nav = new NavGrid(this.navRows);
       this.world.nav = this.nav;
-      this.say(`A secret passage!\n${this.isTouch() ? 'Hold down' : 'Press Down'} on the hatch to climb into the cellar`);
+      // The book can be a floor or more away from its hatch, so say where to look when it's off screen.
+      const inView = this.cameras.main.worldView.contains(hatch.rug.x, hatch.rug.y);
+      this.say(
+        inView
+          ? `A secret passage!\n${this.isTouch() ? 'Hold down' : 'Press Down'} on the hatch to climb into the cellar`
+          : 'Far below, something heavy slides open...\nCheck the library',
+      );
     });
   }
 
