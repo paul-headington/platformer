@@ -27,30 +27,70 @@ export const CAMERA = {
 // WEAPONS
 // Each weapon has a damage value: a shot takes that much off an enemy's health,
 // so the number of shots an enemy takes is its health divided by the damage,
-// rounded up. To add a weapon, add an entry here; its id is the key.
+// rounded up. A shotgun fires several pellets at once, and each pellet that
+// lands does the damage. Which weapons can hurt which enemy is set on the enemy
+// (hurtBy, below). To add a weapon, add an entry here; its id is the key.
 // ============================================================================
 
 export interface WeaponStats {
-  /** Health a shot takes off the enemy it hits. */
+  /** What the player is told when they pick it up. */
+  name: string;
+  /** Health each bullet or pellet takes off the enemy it hits. */
   damage: number;
   /** Bullet speed (px/s). */
   speed: number;
   /** Shortest time between shots (ms). */
   cooldown: number;
-  /** No more of this weapon's bullets than this on screen at once. */
+  /** No more than this many of this weapon's shots on screen at once. */
   maxOnScreen: number;
+  /** Bullets or pellets per shot. */
+  pellets: number;
+  /** How wide the pellets fan out: degrees between the top and bottom pellet. */
+  spread: number;
+  /** Shots fade out and vanish after this far (px). Infinity: until they leave the screen. */
+  range: number;
   /** The bullet's image (a key loaded in BootScene). */
   bullet: string;
+  /** The pickup and HUD image. */
+  icon: string;
 }
 
 export const WEAPONS = {
-  /** The gun found in level 1 (G in the level text). */
-  pistol: { damage: 10, speed: 320, cooldown: 280, maxOnScreen: 3, bullet: 'bullet' },
+  /** The gun found in level 1 (G in the level text). Ghosts shrug it off. */
+  pistol: {
+    name: 'a gun',
+    damage: 10,
+    speed: 320,
+    cooldown: 280,
+    maxOnScreen: 3,
+    pellets: 1,
+    spread: 0,
+    range: Infinity,
+    bullet: 'bullet',
+    icon: 'gun',
+  },
+  /**
+   * The rock salt shotgun (S in the level text): the only thing that hurts a ghost.
+   * Three grains of salt in a fan that only carry six tiles, so it's best up close.
+   */
+  shotgun: {
+    name: 'a rock salt shotgun',
+    damage: 5,
+    speed: 240,
+    cooldown: 650,
+    maxOnScreen: 1,
+    pellets: 3,
+    spread: 20,
+    range: 6 * TILE,
+    bullet: 'salt',
+    icon: 'shotgun',
+  },
 } satisfies Record<string, WeaponStats>;
 
 export type WeaponId = keyof typeof WEAPONS;
 
-/** The weapon a G pickup in the level text gives the player. */
+/** Which weapon each pickup letter in the level text gives the player. */
+export const WEAPON_PICKUPS: Record<string, WeaponId> = { G: 'pistol', S: 'shotgun' };
 export const GUN_PICKUP: WeaponId = 'pistol';
 // ============================================================================
 // ENEMIES
@@ -59,7 +99,8 @@ export const GUN_PICKUP: WeaponId = 'pistol';
 // milliseconds. For scale, the player runs at PLAYER.runSpeed (110).
 //
 // Health works with weapon damage (see WEAPONS): with 30 health and the
-// pistol's 10 damage, an enemy takes 3 shots. Every enemy type has the
+// pistol's 10 damage, an enemy takes 3 shots, as long as the pistol is in its
+// hurtBy list. Every enemy type has the
 // EnemyStats numbers; the rest is particular to how that enemy moves.
 // ============================================================================
 
@@ -70,17 +111,24 @@ export interface EnemyStats {
   damage: number;
   /** Points for killing one. */
   points: number;
+  /** The weapons that can hurt it. Shots from any other weapon pass straight through. */
+  hurtBy: readonly WeaponId[];
+  /** How it dies: 'puff' squashes flat and fades, 'burn' goes up in flames. */
+  death: 'puff' | 'burn';
 }
 
 /** Zombies (z in the level text): walk the floors, take stairs and ladders, can't jump. */
 export const ZOMBIE = {
   // ---- Combat ---------------------------------------------------------------
-  /** Health it starts with (the pistol does 10 a shot, so 10 = one shot, 30 = three). */
-  health: 10,
+  /** Health it starts with: the pistol does 10 a shot, so 20 = two shots. */
+  health: 20,
   /** Lives the player loses when it touches them. */
   damage: 1,
   /** Points for killing one. */
   points: 200,
+  /** Any gun will do. Four grains of rock salt (two close blasts) also put one down. */
+  hurtBy: ['pistol', 'shotgun'],
+  death: 'puff',
 
   // ---- Movement -------------------------------------------------------------
   /** Wandering speed. */
@@ -107,17 +155,21 @@ export const ZOMBIE = {
   trackSteps: 10,
   /** Re-plans its route at least this often (ms). Lower is sharper but costs more CPU. */
   replanEvery: 300,
-} satisfies EnemyStats & Record<string, number>;
+} satisfies EnemyStats & Record<string, number | string | readonly string[]>;
 
 /** Ghosts (g in the level text): drift over their haunt, fly through any open space, never through walls. */
 export const GHOST = {
   // ---- Combat ---------------------------------------------------------------
-  /** Health it starts with (the pistol does 10 a shot, so 10 = one shot, 30 = three). */
+  /** Health it starts with: two grains of rock salt (5 each), so one blast from close up. */
   health: 10,
   /** Lives the player loses when it touches them. */
   damage: 1,
   /** Points for killing one. */
   points: 200,
+  /** Only rock salt hurts a ghost; bullets pass straight through. */
+  hurtBy: ['shotgun'],
+  /** Burns up in a burst of flame. */
+  death: 'burn',
 
   // ---- Movement -------------------------------------------------------------
   /** Drifting back and forth over its haunt: speed, and how far each way from home (px). */
@@ -144,7 +196,7 @@ export const GHOST = {
   leash: 14 * TILE,
   /** Re-plans its flight at least this often (ms). */
   replanEvery: 250,
-} satisfies EnemyStats & Record<string, number>;
+} satisfies EnemyStats & Record<string, number | string | readonly string[]>;
 
 /** Every enemy type by name. A new enemy type gets its own block above and an entry here. */
 export const ENEMIES = { zombie: ZOMBIE, ghost: GHOST } satisfies Record<string, EnemyStats>;
@@ -163,6 +215,8 @@ export const REG = {
   hasGun: 'hasGun',
   /** The WeaponId the player is holding, or null. */
   weapon: 'weapon',
+  /** Every WeaponId the player has picked up, in the order found. */
+  weapons: 'weapons',
   hasKey: 'hasKey',
   message: 'message',
 } as const;

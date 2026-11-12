@@ -8,11 +8,11 @@ import {
   ENEMY_HIT_FLASH,
   GAME_HEIGHT,
   GAME_WIDTH,
-  GUN_PICKUP,
   PLAYER,
   REG,
   SCORE,
   TILE,
+  WEAPON_PICKUPS,
   WEAPONS,
   type EnemyStats,
   type EnemyType,
@@ -58,8 +58,13 @@ const STEP_UP = 10;
 const STEP_DOWN = 8;
 /** Player sheet frames (see tools/sprites.py). */
 const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
-/** The armed poses sit this many frames after the unarmed ones. */
-const PLAYER_GUN_OFFSET = 10;
+/**
+ * Where each weapon's poses start in the player sheet: idle, idle, four run, jump, fall,
+ * in the same order as frames 0-7 (see tools/sprites.py).
+ */
+export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 18 };
+/** How long a burning ghost takes to burn away (ms); the flames take a little longer to die down. */
+const BURN_TIME = 900;
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -98,6 +103,7 @@ export class GameScene extends Phaser.Scene {
   private keyDown: Phaser.Input.Keyboard.Key[] = [];
   private keyJump: Phaser.Input.Keyboard.Key[] = [];
   private keyFire: Phaser.Input.Keyboard.Key[] = [];
+  private keySwitch: Phaser.Input.Keyboard.Key[] = [];
   private keyRestart!: Phaser.Input.Keyboard.Key;
 
   private state: State = 'playing';
@@ -106,6 +112,8 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
+  /** Whether the player has been told that bullets go straight through ghosts. */
+  private toldImmune = false;
   private climbing = false;
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
@@ -123,7 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.state = 'playing';
     this.lastGroundedAt = this.jumpPressedAt = this.lastShotAt = this.lockedHintAt = -Infinity;
     this.invulnerableUntil = this.climbBlockedUntil = 0;
-    this.climbing = this.onStairs = false;
+    this.climbing = this.onStairs = this.toldImmune = false;
     this.traps = [];
     this.sprung = null;
     pad.reset();
@@ -132,6 +140,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set(REG.lives, PLAYER.startLives);
     this.registry.set(REG.hasGun, false);
     this.registry.set(REG.weapon, null);
+    this.registry.set(REG.weapons, []);
     this.registry.set(REG.hasKey, false);
     if (!this.scene.isActive('Hud')) this.scene.launch('Hud');
 
@@ -186,7 +195,7 @@ export class GameScene extends Phaser.Scene {
     this.zombies = this.physics.add.group();
     this.ghosts = this.physics.add.group({ allowGravity: false });
     this.bullets = this.physics.add.group({ allowGravity: false });
-    let gun: Phaser.Physics.Arcade.Image | undefined;
+    const weaponPickups: { image: Phaser.Physics.Arcade.Image; weapon: WeaponId }[] = [];
     let key: Phaser.Physics.Arcade.Image | undefined;
 
     rows.forEach((row, ty) => {
@@ -194,6 +203,10 @@ export class GameScene extends Phaser.Scene {
         const cx = tx * TILE + TILE / 2;
         const cy = ty * TILE + TILE / 2;
         const bottom = (ty + 1) * TILE;
+        if (ch in WEAPON_PICKUPS) {
+          const weapon = WEAPON_PICKUPS[ch];
+          weaponPickups.push({ image: this.physics.add.staticImage(cx, cy + 4, WEAPONS[weapon].icon), weapon });
+        }
         switch (ch) {
           case '*': {
             const gem = gems.create(cx, cy, 'gem') as Sprite;
@@ -201,9 +214,6 @@ export class GameScene extends Phaser.Scene {
             this.tweens.add({ targets: gem, y: cy - 2, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: tx * 40 });
             break;
           }
-          case 'G':
-            gun = this.physics.add.staticImage(cx, cy + 4, 'gun');
-            break;
           case 'K':
             key = this.physics.add.staticImage(cx, cy, 'key');
             this.tweens.add({ targets: key, y: cy - 3, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
@@ -279,12 +289,10 @@ export class GameScene extends Phaser.Scene {
       (g as Phaser.Physics.Arcade.Image).destroy();
       this.addScore(SCORE.gem);
     });
-    if (gun) {
-      this.physics.add.overlap(this.player, gun, () => {
-        gun!.destroy();
-        this.registry.set(REG.hasGun, true);
-        this.registry.set(REG.weapon, GUN_PICKUP);
-        this.say(`You found a gun!\n${this.isTouch() ? 'Tap FIRE' : 'Press X'} to shoot`);
+    for (const { image, weapon } of weaponPickups) {
+      this.physics.add.overlap(this.player, image, () => {
+        image.destroy();
+        this.pickUpWeapon(weapon);
       });
     }
     if (key) {
@@ -299,9 +307,15 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.door, () => this.reachDoor());
     this.physics.add.overlap(this.bullets, [this.zombies, this.ghosts], (b, e) => {
       const bullet = b as Sprite;
-      if (!bullet.active) return;
+      const enemy = e as Sprite;
+      if (!bullet.active || !enemy.active) return;
+      const weapon = bullet.getData('weapon') as WeaponId;
+      if (!(enemy.getData('stats') as EnemyStats).hurtBy.includes(weapon)) {
+        this.passThrough(bullet, enemy);
+        return;
+      }
       bullet.destroy();
-      this.shootEnemy(e as Sprite, bullet.getData('damage') as number);
+      this.shootEnemy(enemy, WEAPONS[weapon].damage);
     });
   }
 
@@ -573,6 +587,7 @@ export class GameScene extends Phaser.Scene {
     this.keyDown = [this.cursors.down, kb.addKey(K.S)];
     this.keyJump = [this.cursors.space, kb.addKey(K.Z)];
     this.keyFire = [kb.addKey(K.X), kb.addKey(K.CTRL)];
+    this.keySwitch = [kb.addKey(K.C), kb.addKey(K.Q)];
     this.keyRestart = kb.addKey(K.ENTER);
   }
 
@@ -661,6 +676,8 @@ export class GameScene extends Phaser.Scene {
     const jumpReleased = releasedKeys || padReleased;
     const fireKey = GameScene.anyJustDown(this.keyFire);
     if (pad.justDown('fire') || fireKey) this.shoot(time);
+    const switchKey = GameScene.anyJustDown(this.keySwitch);
+    if (pad.justDown('switch') || switchKey) this.switchWeapon();
 
     if (this.climbing) {
       this.updateClimbing(left || right, up, down, jumpPressed, time);
@@ -708,14 +725,14 @@ export class GameScene extends Phaser.Scene {
     // Letting go of jump early gives a shorter hop.
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
-    const armed = this.showGun();
+    const held = this.heldWeapon();
     if (!onGround) {
       p.anims.stop();
-      p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (armed ? PLAYER_GUN_OFFSET : 0));
+      p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
-      p.anims.play(armed ? 'player-run-gun' : 'player-run', true);
+      p.anims.play(held ? `player-run-${held}` : 'player-run', true);
     } else {
-      p.anims.play(armed ? 'player-idle-gun' : 'player-idle', true);
+      p.anims.play(held ? `player-idle-${held}` : 'player-idle', true);
     }
   }
 
@@ -777,9 +794,33 @@ export class GameScene extends Phaser.Scene {
     else if (p.anims.isPaused) p.anims.resume();
   }
 
-  /** Whether to draw the player holding the gun: once picked up, if the sheet has the armed frames. */
-  private showGun(): boolean {
-    return !!this.registry.get(REG.hasGun) && this.textures.get('player').has(String(PLAYER_FRAME.fall + PLAYER_GUN_OFFSET));
+  /** The weapon to draw the player holding, if they have one and the sheet has its frames. */
+  private heldWeapon(): WeaponId | null {
+    const id = this.registry.get(REG.weapon) as WeaponId | null;
+    if (!id) return null;
+    return this.textures.get('player').has(String(PLAYER_HOLDING[id] + PLAYER_FRAME.fall)) ? id : null;
+  }
+
+  private pickUpWeapon(id: WeaponId): void {
+    const owned = this.registry.get(REG.weapons) as WeaponId[];
+    if (!owned.includes(id)) this.registry.set(REG.weapons, [...owned, id]);
+    this.registry.set(REG.hasGun, true);
+    this.registry.set(REG.weapon, id);
+    const touch = this.isTouch();
+    if (id === 'shotgun') {
+      const swap = touch ? 'Tap the guns up top' : 'Press C';
+      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost.\n${swap} to switch guns`);
+    } else {
+      this.say(`You found ${WEAPONS[id].name}!\n${touch ? 'Tap FIRE' : 'Press X'} to shoot`);
+    }
+  }
+
+  /** Changes to the next weapon the player has picked up. */
+  private switchWeapon(): void {
+    const owned = this.registry.get(REG.weapons) as WeaponId[];
+    if (owned.length < 2) return;
+    const current = owned.indexOf(this.registry.get(REG.weapon) as WeaponId);
+    this.registry.set(REG.weapon, owned[(current + 1) % owned.length]);
   }
 
   private shoot(time: number): void {
@@ -787,17 +828,62 @@ export class GameScene extends Phaser.Scene {
     if (!id) return;
     const weapon = WEAPONS[id];
     if (time - this.lastShotAt < weapon.cooldown) return;
-    if (this.bullets.countActive() >= weapon.maxOnScreen) return;
+    const live = (this.bullets.getChildren() as Sprite[]).filter((b) => b.getData('weapon') === id).length;
+    if (live >= weapon.maxOnScreen * weapon.pellets) return;
     this.lastShotAt = time;
     const dir = this.player.flipX ? -1 : 1;
-    const b = this.bullets.create(this.player.x + dir * 10, this.player.y + 1, weapon.bullet) as Sprite;
-    b.setData('damage', weapon.damage).setVelocityX(dir * weapon.speed);
+    const x = this.player.x + dir * 10;
+    const y = this.player.y + 1;
+    for (let i = 0; i < weapon.pellets; i++) {
+      // Pellets fan out evenly from the top of the spread to the bottom.
+      const angle = weapon.pellets === 1 ? 0 : weapon.spread * (i / (weapon.pellets - 1) - 0.5);
+      const rad = Phaser.Math.DegToRad(angle);
+      const b = this.bullets.create(x, y, weapon.bullet) as Sprite;
+      b.setData({ weapon: id, fromX: x, fromY: y, passed: [] as Sprite[] });
+      b.setVelocity(dir * weapon.speed * Math.cos(rad), weapon.speed * Math.sin(rad));
+    }
+    if (weapon.pellets > 1) {
+      // A short flash of light at the muzzle, so a blast feels like one.
+      const flash = this.add.image(x + dir * 4, y, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setScale(0.6).setDepth(11);
+      this.tweens.add({ targets: flash, alpha: 0, scale: 0.9, duration: 120, onComplete: () => flash.destroy() });
+    }
   }
 
+  /** Bullets go when they leave the screen; short-range shots fade out and go at the end of their range. */
   private cullBullets(): void {
     const view = this.cameras.main.worldView;
     for (const b of this.bullets.getChildren() as Sprite[]) {
-      if (b.x < view.x - 16 || b.x > view.right + 16) b.destroy();
+      if (b.x < view.x - 16 || b.x > view.right + 16) {
+        b.destroy();
+        continue;
+      }
+      const range = WEAPONS[b.getData('weapon') as WeaponId].range;
+      if (range === Infinity) continue;
+      const travelled = Phaser.Math.Distance.Between(b.getData('fromX'), b.getData('fromY'), b.x, b.y) / range;
+      if (travelled >= 1) b.destroy();
+      else b.setAlpha(1 - travelled ** 3);
+    }
+  }
+
+  /**
+   * A shot from a weapon the enemy shrugs off goes straight through it. The enemy
+   * wavers so the player can see the shot landed and did nothing, and the first
+   * time it happens the player is told why.
+   */
+  private passThrough(bullet: Sprite, enemy: Sprite): void {
+    const passed = bullet.getData('passed') as Sprite[];
+    if (passed.includes(enemy)) return;
+    passed.push(enemy);
+    const alpha = enemy.alpha;
+    this.tweens.add({ targets: enemy, alpha: alpha * 0.35, duration: 70, yoyo: true, onComplete: () => enemy.setAlpha(alpha) });
+    if (!this.toldImmune && enemy.getData('type') === 'ghost') {
+      this.toldImmune = true;
+      const owned = this.registry.get(REG.weapons) as WeaponId[];
+      this.say(
+        owned.includes('shotgun')
+          ? `Bullets go straight through ghosts!\n${this.isTouch() ? 'Tap the guns up top' : 'Press C'} for the rock salt`
+          : 'Bullets go straight through ghosts!\nThere must be something else...',
+      );
     }
   }
 
@@ -946,10 +1032,42 @@ export class GameScene extends Phaser.Scene {
   }
 
   private killEnemy(enemy: Sprite): void {
-    this.addScore((enemy.getData('stats') as EnemyStats).points);
-    const puff = this.add.image(enemy.x, enemy.y, enemy.texture.key, 0).setFlipX(enemy.flipX);
+    const stats = enemy.getData('stats') as EnemyStats;
+    this.addScore(stats.points);
+    const body = this.add.image(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
     enemy.destroy();
-    this.tweens.add({ targets: puff, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => puff.destroy() });
+    if (stats.death === 'burn') this.burnUp(body);
+    else this.tweens.add({ targets: body, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => body.destroy() });
+  }
+
+  /**
+   * The rock salt sets a ghost alight: it flares up in flames, glows red and
+   * shrivels away while the fire roars, then the fire dies down and embers float off.
+   */
+  private burnUp(ghost: Phaser.GameObjects.Image): void {
+    const { x, y } = ghost;
+    ghost.setTint(0xffa060).setDepth(7);
+    this.tweens.add({ targets: ghost, y: y - 6, scaleX: 0.5, scaleY: 0.8, alpha: 0, duration: BURN_TIME, ease: 'Quad.in', onComplete: () => ghost.destroy() });
+
+    const fire = this.add.sprite(x, y + 8, 'fire', 0).setOrigin(0.5, 1).setDepth(6).play('fire-burn');
+    fire.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => fire.destroy());
+
+    const glow = this.add.image(x, y, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setScale(1.3).setDepth(4);
+    this.tweens.add({ targets: glow, alpha: 0.6, scale: 1.15, duration: 90, yoyo: true, repeat: 4 });
+    this.tweens.add({ targets: glow, alpha: 0, delay: BURN_TIME, duration: 400, onComplete: () => glow.destroy() });
+
+    for (let i = 0; i < 8; i++) {
+      const ember = this.add.image(x + Phaser.Math.Between(-6, 6), y + Phaser.Math.Between(-2, 6), 'ember').setDepth(8);
+      this.tweens.add({
+        targets: ember,
+        x: ember.x + Phaser.Math.Between(-10, 10),
+        y: ember.y - Phaser.Math.Between(18, 34),
+        alpha: 0,
+        delay: Phaser.Math.Between(0, BURN_TIME),
+        duration: Phaser.Math.Between(500, 900),
+        onComplete: () => ember.destroy(),
+      });
+    }
   }
 
   private isTouch(): boolean {
