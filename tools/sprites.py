@@ -44,6 +44,9 @@ PALETTE = {
     'm': (154, 160, 170),  # metal
     'M': (92, 96, 107),    # metal shade
     'o': (255, 242, 122),  # bullet glow
+    'e': (150, 98, 58),    # shotgun stock (walnut)
+    'E': (98, 62, 38),     # stock shade
+    'x': (214, 220, 236),  # rock salt grain shade
 }
 
 # ---------------------------------------------------------------- characters
@@ -227,6 +230,20 @@ kkkskkk
 """
 
 
+# The rock salt shotgun held at the hip: the same hand and barrel line as the
+# pistol, with the walnut pump and stock running back under the forearm.
+# Stamped at x=8, so the hand sits exactly where the pistol's does.
+SHOTGUN_IN_HAND = """
+.....kkkkkkk
+.....jjjsmmm
+.....jJksMMM
+kkkkkkkeeemk
+keeeeeeEEEk.
+kEEkkkkkkkk.
+kkk.........
+"""
+
+
 def mirror(part):
     return '\n'.join(row[::-1] for row in part.strip('\n').split('\n'))
 
@@ -240,13 +257,19 @@ def pose(head_dy, body, legs, legs_dy=0):
     return [(legs, 3, 17 + legs_dy), (body, 3, 10 + head_dy), (HEAD, 5, head_dy)]
 
 
-def gun_pose(head_dy, body, legs):
-    return pose(head_dy, body, legs) + [(GUN_IN_HAND, 13, 11 + head_dy)]
+def gun_pose(head_dy, body, legs, gun=None):
+    held = (GUN_IN_HAND, 13, 11 + head_dy) if gun is None else (gun, 8, 11 + head_dy)
+    return pose(head_dy, body, legs) + [held]
+
+
+def shotgun_pose(head_dy, body, legs):
+    return gun_pose(head_dy, body, legs, SHOTGUN_IN_HAND)
 
 
 # Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb,
 # then the same idle/run/jump/fall poses holding the gun: 10-11 idle, 12-15 run,
-# 16 jump, 17 fall.
+# 16 jump, 17 fall; and again holding the rock salt shotgun: 18-19 idle, 20-23 run,
+# 24 jump, 25 fall.
 PLAYER = [
     pose(0, BODY_IDLE, LEGS_STAND),
     pose(1, BODY_IDLE, LEGS_STAND),
@@ -266,6 +289,14 @@ PLAYER = [
     gun_pose(0, BODY_AIM, LEGS_PASS),
     gun_pose(0, BODY_AIM, LEGS_TUCK),
     gun_pose(0, BODY_AIM, LEGS_DANGLE),
+    shotgun_pose(0, BODY_AIM, LEGS_STAND),
+    shotgun_pose(1, BODY_AIM, LEGS_STAND),
+    shotgun_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
+    shotgun_pose(0, BODY_AIM, LEGS_PASS),
+    shotgun_pose(1, BODY_AIM, LEGS_STRIDE),
+    shotgun_pose(0, BODY_AIM, LEGS_PASS),
+    shotgun_pose(0, BODY_AIM, LEGS_TUCK),
+    shotgun_pose(0, BODY_AIM, LEGS_DANGLE),
 ]
 
 ZOMBIE_HEAD = """
@@ -478,6 +509,26 @@ kyoook
 .kkkk.
 """]
 
+# The rock salt shotgun pickup (and HUD icon): double barrel, walnut pump and stock.
+SHOTGUN = ["""
+.............kk.
+.kkkkkkkkkkkkmk.
+kmmmmmmmmmmmmmmk
+kMMMMMMMMMMMMMMk
+.kkkkkeeeekkkkk.
+kkk..kEEEEk.....
+keekkk..........
+kEeeek..........
+.kkkkk..........
+"""]
+
+# One grain of rock salt; a shotgun blast fires a few in a fan.
+SALT = ["""
+.w.
+wwx
+.x.
+"""]
+
 # Pops up over a zombie's head: 0 "!" when it spots the player, 1 "?" when it loses them.
 EMOTE = ["""
 ..kkk..
@@ -531,6 +582,42 @@ def build(frames, palette=PALETTE, size=None) -> Image.Image:
                 if ch != '.':
                     img.putpixel((i * w + x, y), palette[ch] + (255,))
     return img
+
+
+# ================================================================ fire
+# A burning ghost: 0-3 roaring flames (loop), 4-6 dying down to embers.
+# Drawn from a height for each column, with the hottest colours at the
+# bottom middle, so the flames are generated rather than hand drawn.
+FIRE_PAL = {'R': (122, 24, 26), 'r': (214, 58, 34), 'o': (255, 140, 40), 'y': (255, 214, 84), 'w': (255, 250, 214)}
+
+
+def fire_art(t, size=1.0, w=20, h=26):
+    import math
+    rows = [['.'] * w for _ in range(h)]
+    cx = (w - 1) / 2
+    for x in range(w):
+        dx = (x - cx) / (w / 2)
+        envelope = max(0.0, 1 - dx * dx * 1.15)
+        tongues = 0.22 * math.sin(x * 1.9 + t * 2.1) + 0.14 * math.sin(x * 3.7 - t * 2.9)
+        height = h * size * envelope * (0.72 + tongues)
+        for y in range(h):
+            up = h - 1 - y
+            if up >= height:
+                continue
+            heat = (1 - up / max(height, 1)) * (1 - abs(dx) * 0.8)
+            rows[y][x] = 'w' if heat > 0.78 else 'y' if heat > 0.55 else 'o' if heat > 0.32 else 'r' if heat > 0.14 else 'R'
+    # A few loose flecks of flame above the tips.
+    for i in range(3):
+        fx = int(cx + 6 * math.sin(t * 1.7 + i * 2.3))
+        fy = int(h - h * size * 0.95 - 2 - ((t * 3 + i * 4) % 6))
+        if 0 <= fx < w and 0 <= fy < h and size > 0.3:
+            rows[fy][fx] = 'o' if i % 2 else 'y'
+    return '\n'.join(''.join(r) for r in rows)
+
+
+FIRE = [(fire_art(t), FIRE_PAL) for t in range(4)] + [(fire_art(4, s), FIRE_PAL) for s in (0.6, 0.35, 0.15)]
+EMBER_PAL = {'o': (255, 150, 50), 'y': (255, 226, 120)}
+EMBER = [("yo\noo", EMBER_PAL)]
 
 
 # ================================================================ house tiles
@@ -1191,6 +1278,8 @@ TILE_SHEETS = {
     'snake': [(rise(SNAKE_BODY, 13), SNAKE_PAL), (rise(SNAKE_BODY, 6), SNAKE_PAL),
               (SNAKE_TONGUE, SNAKE_PAL), (SNAKE_STRIKE, SNAKE_PAL)],
     'door': [(door_art(False), DOOR_PAL), (door_art(True), DOOR_PAL)],
+    'fire': FIRE,
+    'ember': EMBER,
     # Tentacles reaching out of a vent: 0 none, 1-2 sliding out, 3-5 swaying
     'tentacle': [(tentacle_art(l, sw, cu), TENTACLE_PAL) for l, sw, cu in
                  [(0, 0, False), (5, 0, False), (11, 3, False), (18, -7, False), (19, 7, False), (18, 2, True)]],
@@ -1225,7 +1314,8 @@ def build_tiles(frames) -> Image.Image:
 
 SHEETS = {
     'player': PLAYER, 'zombie': ZOMBIE, 'ghost': GHOST,
-    'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET, 'emote': EMOTE,
+    'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
+    'shotgun': SHOTGUN, 'salt': SALT, 'emote': EMOTE,
 }
 
 

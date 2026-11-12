@@ -5,6 +5,7 @@
  *   =  wooden shelf (jump up through it)
  *   H  ladder (Up/Down)              /  \  stairs (walk up them)
  *   *  gem                           G  gun pickup
+ *   S  rock salt shotgun pickup (the only thing that hurts ghosts)
  *   K  key (opens the exit door)     D  exit door
  *   P  player start                  z  zombie (walks)
  *   g  ghost (floats; flies after the player, through any open space)
@@ -38,7 +39,8 @@
  * Ladders: the top H of a ladder can be stood on, so a ladder can poke up
  * through a hole in a floor. Press Down on it to climb back down.
  *
- * The route: through the downstairs hall, up the grand staircase, east along the
+ * The route: through the downstairs hall (the gun on the first shelf, the
+ * rock salt shotgun on the shelf at the foot of the stairs), up the grand staircase, east along the
  * upstairs landing, up the ladder into the attic for the key, then drop through
  * the broken floorboards, down the trapdoor into the cellar, and up into the
  * east wing to the door.
@@ -71,7 +73,7 @@ const MAP = String.raw`
 #             #     v             #               /###      v               #                      #
 #        ww   #         f   f     #     f        /####        ww            #         f     ww     #
 # c      ww c #           c       #             /#####        ww  c   g   c #               ww    c#
-#             #     G             #  * *       /######               * *    #            **        #
+#             #     G             #  *S*       /######               * *    #            **        #
 #                 =====             =====     /#######              =====               ====       #
 #               b               b            /########                        b                    #
 #  P            b     * *   z   b           /###M#####                        b z               D  #

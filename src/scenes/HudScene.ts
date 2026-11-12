@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, REG } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, REG, WEAPONS, type WeaponId } from '../config';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
 
@@ -7,7 +7,9 @@ import type { HudMessage } from './GameScene';
 export class HudScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
-  private gunIcon!: Phaser.GameObjects.Image;
+  private weaponIcons = new Map<WeaponId, Phaser.GameObjects.Image>();
+  /** A box around the weapon in hand. */
+  private weaponMark!: Phaser.GameObjects.Rectangle;
   private keyIcon!: Phaser.GameObjects.Image;
   private message!: Phaser.GameObjects.Text;
 
@@ -20,8 +22,24 @@ export class HudScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
     this.scoreText = this.add.text(4, 2, '', style);
     this.livesText = this.add.text(110, 2, '', style);
-    this.gunIcon = this.add.image(GAME_WIDTH - 36, 5, 'gun');
-    this.keyIcon = this.add.image(GAME_WIDTH - 16, 5, 'key');
+    // One icon per weapon, right to left before the key. Tapping or clicking them switches guns.
+    this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
+    let right = GAME_WIDTH - 28;
+    for (const id of (Object.keys(WEAPONS) as WeaponId[]).reverse()) {
+      const icon = this.add.image(right, 6, WEAPONS[id].icon).setOrigin(1, 0.5);
+      right -= icon.displayWidth + 6;
+      this.weaponIcons.set(id, icon);
+    }
+    const iconsLeft = right + 2;
+    this.add
+      .zone(iconsLeft, 0, GAME_WIDTH - 24 - iconsLeft, 14)
+      .setOrigin(0, 0)
+      .setInteractive()
+      .on('pointerdown', () => {
+        pad.press('switch');
+        pad.release('switch');
+      });
+    this.keyIcon = this.add.image(GAME_WIDTH - 12, 5, 'key');
 
     this.message = this.add
       .text(GAME_WIDTH / 2, 70, '', { ...style, align: 'center', stroke: '#000000', strokeThickness: 3, lineSpacing: 4 })
@@ -51,7 +69,12 @@ export class HudScene extends Phaser.Scene {
     const score = (this.registry.get(REG.score) as number) ?? 0;
     this.scoreText.setText(`SCORE ${String(score).padStart(6, '0')}`);
     this.livesText.setText(`LIVES ${this.registry.get(REG.lives) ?? 0}`);
-    this.gunIcon.setAlpha(this.registry.get(REG.hasGun) ? 1 : 0.15);
+    const owned = (this.registry.get(REG.weapons) as WeaponId[] | undefined) ?? [];
+    const held = this.registry.get(REG.weapon) as WeaponId | null;
+    for (const [id, icon] of this.weaponIcons) icon.setAlpha(id === held ? 1 : owned.includes(id) ? 0.55 : 0.15);
+    const heldIcon = held && this.weaponIcons.get(held);
+    this.weaponMark.setVisible(!!heldIcon && owned.length > 1);
+    if (heldIcon) this.weaponMark.setPosition(heldIcon.x - heldIcon.displayWidth / 2, 6).setSize(heldIcon.displayWidth + 4, 11);
     this.keyIcon.setAlpha(this.registry.get(REG.hasKey) ? 1 : 0.15);
   }
 
