@@ -54,8 +54,12 @@
  * west, with a zombie waiting at the foot of the stairs), up the grand staircase
  * to the rock salt shotgun on the landing at the top (before the first ghost,
  * which haunts the far end of that room), east along the upstairs landing, up the
- * ladder into the attic for the key, then drop through the broken floorboards
- * into the west bedroom, pull the loose book on its bookcase to open the secret
+ * ladder to the top floor and west through the portrait gallery (past a zombie,
+ * two trapdoors, a wall of crates and a ghost) to the ladder into the attic,
+ * west along the attic for the key, then drop through the gap in the boards at
+ * its far west end into the nursery (walled off from the gallery, so it is only
+ * reached this way), and on through the broken floor by the trapdoor down into
+ * the west bedroom. Pull the loose book on its bookcase to open the secret
  * hatch under the rug in the library, down through the hole in the floor to the
  * hall and on into the library, climb down into the cellar, pick up the machete
  * stuck in the crates, and up into the east wing, where the vampire guards the door.
@@ -74,7 +78,16 @@ const MAP = String.raw`
     ##                           c                  ww          c                             ##    
   ##                  XX             X              ww    XXX                                   ##  
 ##      K   *         XX      z     XX                    XXX                                     ##
-################  ##########################TTT#######################TT##################H#########
+####  ######################################TTT###H###################TT############################
+#%                                     %#%        H                     #                         %#
+#                           v           #         H                     #               v          #
+#        ww                             #         H                     #    ww               ww   #
+#        ww         c          f        #     c   H     f g f    f      #  c ww    f          ww   #
+#            * *                  **    #         H    * *              #            **            #
+#           =====                ====   #         H   =====             %           ====           #
+#                                    b  #         H           XX                                   #
+#                                z   b  #   * *   H           XX                z                  #
+###################TT####  #######################################TT#############TT#######H#########
 #%                                     %#             %                 #                 H       %#
 #                         v       ww    #                               #         v       H        #
 #         ww                      ww    #               ww              #           g ww  H        #
@@ -104,7 +117,7 @@ const MAP = String.raw`
 `;
 
 /** Wallpaper zones, top to bottom: each starts at a row and runs until the next. */
-export type BackStyle = 'attic' | 'upstairs' | 'downstairs' | 'cellar';
+export type BackStyle = 'attic' | 'gallery' | 'upstairs' | 'downstairs' | 'cellar';
 
 export interface Level {
   rows: string[];
@@ -115,8 +128,9 @@ export const LEVEL_1: Level = {
   rows: MAP.split('\n').filter((row) => row.length > 0),
   zones: [
     { fromRow: 0, style: 'attic' },
-    { fromRow: 12, style: 'upstairs' },
-    { fromRow: 21, style: 'downstairs' },
-    { fromRow: 30, style: 'cellar' },
+    { fromRow: 12, style: 'gallery' },
+    { fromRow: 21, style: 'upstairs' },
+    { fromRow: 30, style: 'downstairs' },
+    { fromRow: 39, style: 'cellar' },
   ],
 };

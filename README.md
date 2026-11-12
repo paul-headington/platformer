@@ -67,3 +67,4 @@ In dev mode (`npm run dev`) the game is available as `window.game` in the browse
 4. Package for web, desktop and mobile. Done: touch controls, installable web app, GitHub Pages deploy, Electron desktop app.
 5. Vertical levels: ladders, stairs and a camera that scrolls up and down. Level 1 is now three floors tall.
 6. Haunted house look: moonlit tiles, wallpaper, windows, candles and cobwebs, and level 1 rebuilt as a house with an attic, two storeys and a cellar.
+7. A longer level 1: a third storey between the upstairs and the attic, with a portrait gallery on the way up to the attic and a walled-off nursery you only reach by dropping through the attic floor.
