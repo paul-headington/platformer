@@ -7,7 +7,7 @@
  *   *  gem                           G  gun pickup
  *   K  key (opens the exit door)     D  exit door
  *   P  player start                  z  zombie (walks)
- *   g  ghost (floats)
+ *   g  ghost (floats; flies after the player, through any open space)
  *   T  trapdoor: put it in a floor, in place of a #. It looks almost exactly like
  *      the floor around it, and drops the player into a pit of snakes. A run of
  *      T is one wide trapdoor. Zombies are too light to set one off.
