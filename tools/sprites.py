@@ -842,6 +842,22 @@ kKKyKkkMMMMMMMMMk.
 .kkkk.kkkkkkkkkk..
 """]
 
+# The spare leather jacket in the attic (an extra life): worn brown leather with the
+# plaid flannel lining showing down the open front, and a pocket flap on each side.
+JACKET = ["""
+...kkkkkkkk...
+..klllFFlllk..
+.kjjllfflljjk.
+kjjjlJFFJljjjk
+kjkjjJffJjjkjk
+kjkjjJFFJjjkjk
+kjkjjJffJjjkjk
+kjklkJFFJklkjk
+kjkjjJffJjjkjk
+kJkJJJFFJJJkJk
+kkkkkkkkkkkkkk
+"""]
+
 # One grain of rock salt; a shotgun blast fires a few in a fan.
 SALT = ["""
 .w.
@@ -1747,7 +1763,7 @@ SHEETS = {
     'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
     'shotgun': SHOTGUN, 'salt': SALT, 'emote': EMOTE,
     'vampire': VAMPIRE, 'vampire-head': VAMPIRE_HEAD, 'machete': MACHETE,
-    'zombie-head': ZOMBIE_HEAD_ONLY, 'gore': GORE,
+    'zombie-head': ZOMBIE_HEAD_ONLY, 'gore': GORE, 'jacket': JACKET,
 }
 
 

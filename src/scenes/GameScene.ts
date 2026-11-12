@@ -261,6 +261,7 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.physics.add.group({ allowGravity: false });
     const weaponPickups: { image: Phaser.Physics.Arcade.Image; weapon: WeaponId }[] = [];
     let key: Phaser.Physics.Arcade.Image | undefined;
+    const jackets: Phaser.Physics.Arcade.Image[] = [];
 
     rows.forEach((row, ty) => {
       [...row].forEach((ch, tx) => {
@@ -282,6 +283,15 @@ export class GameScene extends Phaser.Scene {
             key = this.physics.add.staticImage(cx, cy, 'key');
             this.tweens.add({ targets: key, y: cy - 3, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
             break;
+          case 'J': {
+            // Sits on the floor, with a slow bob and a faint glow so it reads as a pickup.
+            const glow = this.add.image(cx, bottom - 6, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setDepth(-1);
+            this.tweens.add({ targets: glow, alpha: 0.25, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+            const jacket = this.physics.add.staticImage(cx, bottom - 7, 'jacket').setData('glow', glow);
+            this.tweens.add({ targets: jacket, y: bottom - 9, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+            jackets.push(jacket);
+            break;
+          }
           case 'D':
             this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setOrigin(0.5, 1).refreshBody();
             break;
@@ -382,6 +392,15 @@ export class GameScene extends Phaser.Scene {
         this.door.setFrame(1);
         this.addScore(SCORE.key);
         this.say('Got the key! The door is open.');
+      });
+    }
+    for (const jacket of jackets) {
+      this.physics.add.overlap(this.player, jacket, () => {
+        (jacket.getData('glow') as Phaser.GameObjects.Image).destroy();
+        jacket.destroy();
+        this.registry.set(REG.lives, (this.registry.get(REG.lives) as number) + 1);
+        this.addScore(SCORE.jacket);
+        this.say('A spare leather jacket!\nExtra life!');
       });
     }
     this.physics.add.overlap(this.player, this.door, () => this.reachDoor());
