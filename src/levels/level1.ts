@@ -16,7 +16,8 @@
  *      floor, hidden under a rug, until the player pulls the loose book (B); then
  *      it swings open onto the ladder. Enemies treat it as floor until then too.
  *   B  the loose book, on a library bookcase (L). Standing in front of it, E (or
- *      the USE button on touch screens) pulls it and opens the nearest hatch.
+ *      the USE button on touch screens) pulls it and opens the nearest hatch, even
+ *      one on another floor.
  *
  * Decorations (no collision, drawn behind the player):
  *
@@ -50,9 +51,10 @@
  * west, with a zombie waiting at the foot of the stairs), up the grand staircase
  * to the rock salt shotgun on the landing at the top (before the first ghost,
  * which haunts the far end of that room), east along the upstairs landing, up the
- * ladder into the attic for the key, then drop through the broken floorboards,
- * back down to the library next to the hall, pull the loose book to open the
- * secret hatch under the rug, climb down into the cellar, and up into the east
+ * ladder into the attic for the key, then drop through the broken floorboards
+ * into the west bedroom, pull the loose book on its bookcase to open the secret
+ * hatch under the rug in the library, down through the hole in the floor to the
+ * hall and on into the library, climb down into the cellar, and up into the east
  * wing to the door.
  *
  * The map is a raw string (so \ needs no escaping), split into rows below.
@@ -73,18 +75,18 @@ const MAP = String.raw`
 #%                                     %#             %                 #                 H       %#
 #                         v       ww    #                               #         v       H        #
 #         ww                      ww    #               ww              #           g ww  H        #
-#   c     ww    f   g     c             #               ww    c    gf   # c   f       ww  H c      #
-#      * *                        **    #                    **         #        * *      H        #
-#     =====                             #                   ====         %      =====     H    *   #
-#                                    b  #                                                 H        #
-#                                    b  #              S                    z             H   * *  #
+#   c     ww LL f   g     c             #               ww    c    gf   # c   f       ww  H c      #
+#      * *   LL                   **    #                    **         #        * *      H        #
+#     =====  LB                         #                   ====         %      =====     H    *   #
+#            LL                      b  #                                                 H        #
+#            LL                      b  #              S                    z             H   * *  #
 ######################TT######  ############        /#############TTT###############################
 #%            #%                  #       %        /##%                     #%                     #
 #  c     c    #     v             #               /###      v               #                      #
 #LL    ww   LL#         f   f     #     f        /####        ww            #         f     ww     #
 #LL    ww   LL#           c       #             /#####        ww  c   g   c #               ww    c#
 #LL         LL#     G             #  * *       /######               * *    #            **        #
-#LL         LB    =====             =====     /#######              =====               ====       #
+#LL         LL    =====             =====     /#######              =====               ====       #
 #LL         LL  b               b            /########                        b                    #
 #LL      a  LL  b     * * P     b        z  /###M#####                        b z               D  #
 ######h###################################################H#####TT##################TTT#############
