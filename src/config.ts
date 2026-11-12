@@ -23,19 +23,60 @@ export const CAMERA = {
   minSpeed: 60,
 };
 
-export const BULLET = { speed: 320, cooldown: 280, maxOnScreen: 3 };
+// ============================================================================
+// WEAPONS
+// Each weapon has a damage value: a shot takes that much off an enemy's health,
+// so the number of shots an enemy takes is its health divided by the damage,
+// rounded up. To add a weapon, add an entry here; its id is the key.
+// ============================================================================
+
+export interface WeaponStats {
+  /** Health a shot takes off the enemy it hits. */
+  damage: number;
+  /** Bullet speed (px/s). */
+  speed: number;
+  /** Shortest time between shots (ms). */
+  cooldown: number;
+  /** No more of this weapon's bullets than this on screen at once. */
+  maxOnScreen: number;
+  /** The bullet's image (a key loaded in BootScene). */
+  bullet: string;
+}
+
+export const WEAPONS = {
+  /** The gun found in level 1 (G in the level text). */
+  pistol: { damage: 10, speed: 320, cooldown: 280, maxOnScreen: 3, bullet: 'bullet' },
+} satisfies Record<string, WeaponStats>;
+
+export type WeaponId = keyof typeof WEAPONS;
+
+/** The weapon a G pickup in the level text gives the player. */
+export const GUN_PICKUP: WeaponId = 'pistol';
 // ============================================================================
 // ENEMIES
 // Every number that changes how an enemy behaves lives here. Distances are in
 // pixels (one tile is TILE = 16 px), speeds in pixels per second and times in
 // milliseconds. For scale, the player runs at PLAYER.runSpeed (110).
+//
+// Health works with weapon damage (see WEAPONS): with 30 health and the
+// pistol's 10 damage, an enemy takes 3 shots. Every enemy type has the
+// EnemyStats numbers; the rest is particular to how that enemy moves.
 // ============================================================================
+
+export interface EnemyStats {
+  /** Health it starts with. Each shot takes the weapon's damage off it; it dies at 0. */
+  health: number;
+  /** Lives the player loses when it touches them. */
+  damage: number;
+  /** Points for killing one. */
+  points: number;
+}
 
 /** Zombies (z in the level text): walk the floors, take stairs and ladders, can't jump. */
 export const ZOMBIE = {
   // ---- Combat ---------------------------------------------------------------
-  /** Bullets it takes to kill one. */
-  hits: 1,
+  /** Health it starts with (the pistol does 10 a shot, so 10 = one shot, 30 = three). */
+  health: 10,
   /** Lives the player loses when it touches them. */
   damage: 1,
   /** Points for killing one. */
@@ -66,13 +107,13 @@ export const ZOMBIE = {
   trackSteps: 10,
   /** Re-plans its route at least this often (ms). Lower is sharper but costs more CPU. */
   replanEvery: 300,
-};
+} satisfies EnemyStats & Record<string, number>;
 
 /** Ghosts (g in the level text): drift over their haunt, fly through any open space, never through walls. */
 export const GHOST = {
   // ---- Combat ---------------------------------------------------------------
-  /** Bullets it takes to kill one. */
-  hits: 1,
+  /** Health it starts with (the pistol does 10 a shot, so 10 = one shot, 30 = three). */
+  health: 10,
   /** Lives the player loses when it touches them. */
   damage: 1,
   /** Points for killing one. */
@@ -103,7 +144,11 @@ export const GHOST = {
   leash: 14 * TILE,
   /** Re-plans its flight at least this often (ms). */
   replanEvery: 250,
-};
+} satisfies EnemyStats & Record<string, number>;
+
+/** Every enemy type by name. A new enemy type gets its own block above and an entry here. */
+export const ENEMIES = { zombie: ZOMBIE, ghost: GHOST } satisfies Record<string, EnemyStats>;
+export type EnemyType = keyof typeof ENEMIES;
 
 /** How a hit that doesn't kill an enemy looks: it flashes this colour for this long (ms). */
 export const ENEMY_HIT_FLASH = { tint: 0xffffff, duration: 120 };
@@ -116,6 +161,8 @@ export const REG = {
   score: 'score',
   lives: 'lives',
   hasGun: 'hasGun',
+  /** The WeaponId the player is holding, or null. */
+  weapon: 'weapon',
   hasKey: 'hasKey',
   message: 'message',
 } as const;

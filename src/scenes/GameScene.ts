@@ -2,7 +2,22 @@ import Phaser from 'phaser';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
-import { BULLET, CAMERA, ENEMY_HIT_FLASH, GAME_HEIGHT, GAME_WIDTH, GHOST, PLAYER, REG, SCORE, TILE, ZOMBIE } from '../config';
+import {
+  CAMERA,
+  ENEMIES,
+  ENEMY_HIT_FLASH,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  GUN_PICKUP,
+  PLAYER,
+  REG,
+  SCORE,
+  TILE,
+  WEAPONS,
+  type EnemyStats,
+  type EnemyType,
+  type WeaponId,
+} from '../config';
 import { pad } from '../input/VirtualPad';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -42,9 +57,6 @@ const DECOR = { window: 0, cobwebLeft: 4, cobwebRight: 5, portrait: 6, bookcase:
 const STEP_UP = 10;
 const STEP_DOWN = 8;
 /** Player sheet frames (see tools/sprites.py). */
-/** The combat numbers every enemy type has in config.ts. */
-type EnemyStats = { hits: number; damage: number; points: number };
-
 const PLAYER_FRAME = { jump: 6, fall: 7, hurt: 7 } as const;
 /** The armed poses sit this many frames after the unarmed ones. */
 const PLAYER_GUN_OFFSET = 10;
@@ -119,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set(REG.score, 0);
     this.registry.set(REG.lives, PLAYER.startLives);
     this.registry.set(REG.hasGun, false);
+    this.registry.set(REG.weapon, null);
     this.registry.set(REG.hasKey, false);
     if (!this.scene.isActive('Hud')) this.scene.launch('Hud');
 
@@ -210,13 +223,13 @@ export class GameScene extends Phaser.Scene {
           case 'z': {
             const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
             (z.body as Body).setSize(8, 21).setOffset(6, 3);
-            z.setData({ stats: ZOMBIE, hp: ZOMBIE.hits }).play('zombie-walk');
+            this.setEnemy(z, 'zombie').play('zombie-walk');
             break;
           }
           case 'g': {
             const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
             (gh.body as Body).setSize(12, 12).setOffset(4, 3);
-            gh.setData({ phase: tx, stats: GHOST, hp: GHOST.hits }).setAlpha(0.85).play('ghost-float');
+            this.setEnemy(gh, 'ghost').setData('phase', tx).setAlpha(0.85).play('ghost-float');
             break;
           }
         }
@@ -270,6 +283,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.player, gun, () => {
         gun!.destroy();
         this.registry.set(REG.hasGun, true);
+        this.registry.set(REG.weapon, GUN_PICKUP);
         this.say(`You found a gun!\n${this.isTouch() ? 'Tap FIRE' : 'Press X'} to shoot`);
       });
     }
@@ -284,8 +298,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.physics.add.overlap(this.player, this.door, () => this.reachDoor());
     this.physics.add.overlap(this.bullets, [this.zombies, this.ghosts], (b, e) => {
-      (b as Sprite).destroy();
-      this.shootEnemy(e as Sprite);
+      const bullet = b as Sprite;
+      if (!bullet.active) return;
+      bullet.destroy();
+      this.shootEnemy(e as Sprite, bullet.getData('damage') as number);
     });
   }
 
@@ -767,13 +783,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shoot(time: number): void {
-    if (!this.registry.get(REG.hasGun)) return;
-    if (time - this.lastShotAt < BULLET.cooldown) return;
-    if (this.bullets.countActive() >= BULLET.maxOnScreen) return;
+    const id = this.registry.get(REG.weapon) as WeaponId | null;
+    if (!id) return;
+    const weapon = WEAPONS[id];
+    if (time - this.lastShotAt < weapon.cooldown) return;
+    if (this.bullets.countActive() >= weapon.maxOnScreen) return;
     this.lastShotAt = time;
     const dir = this.player.flipX ? -1 : 1;
-    const b = this.bullets.create(this.player.x + dir * 10, this.player.y + 1, 'bullet') as Sprite;
-    b.setVelocityX(dir * BULLET.speed);
+    const b = this.bullets.create(this.player.x + dir * 10, this.player.y + 1, weapon.bullet) as Sprite;
+    b.setData('damage', weapon.damage).setVelocityX(dir * weapon.speed);
   }
 
   private cullBullets(): void {
@@ -907,12 +925,18 @@ export class GameScene extends Phaser.Scene {
     this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\n${this.isTouch() ? 'Tap' : 'Press Enter'} to play again`, true);
   }
 
-  /** A bullet hits an enemy: it dies once it has taken its `hits`, otherwise it flashes and turns on the player. */
-  private shootEnemy(enemy: Sprite): void {
+  /** Gives a new enemy sprite its type's stats and full health. */
+  private setEnemy(enemy: Sprite, type: EnemyType): Sprite {
+    const stats: EnemyStats = ENEMIES[type];
+    return enemy.setData({ type, stats, health: stats.health });
+  }
+
+  /** A shot takes `damage` off an enemy's health: at 0 it dies, otherwise it flashes and turns on the player. */
+  private shootEnemy(enemy: Sprite, damage: number): void {
     if (!enemy.active) return;
-    const hp = (enemy.getData('hp') as number) - 1;
-    enemy.setData('hp', hp);
-    if (hp > 0) {
+    const health = (enemy.getData('health') as number) - damage;
+    enemy.setData('health', health);
+    if (health > 0) {
       enemy.setTint(ENEMY_HIT_FLASH.tint).setTintMode(Phaser.TintModes.FILL);
       this.time.delayedCall(ENEMY_HIT_FLASH.duration, () => enemy.active && enemy.clearTint().setTintMode(Phaser.TintModes.MULTIPLY));
       (enemy.getData('brain') as ZombieBrain | GhostBrain).shot(this.time.now);
