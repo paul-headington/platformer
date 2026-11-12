@@ -926,21 +926,26 @@ export class GameScene extends Phaser.Scene {
     return this.textures.get('player').has(String(PLAYER_HOLDING[id] + PLAYER_FRAME.fall)) ? id : null;
   }
 
+  /**
+   * Adds a weapon to the player's kit. The weapon in hand stays in hand: a new one is
+   * only equipped when the player has nothing yet. The hint says how to switch to it.
+   */
   private pickUpWeapon(id: WeaponId): void {
     const owned = this.registry.get(REG.weapons) as WeaponId[];
     if (!owned.includes(id)) this.registry.set(REG.weapons, [...owned, id]);
     this.registry.set(REG.hasGun, true);
-    this.registry.set(REG.weapon, id);
+    const equip = !this.registry.get(REG.weapon);
+    if (equip) this.registry.set(REG.weapon, id);
     const touch = this.isTouch();
-    if (id === 'shotgun') {
-      this.say(`You found ${WEAPONS[id].name}!\nOnly rock salt stops a ghost,\nbut it bounces off zombies.\n${this.swapHint()} to switch`);
-    } else if (id === 'machete') {
-      this.say(
-        `You found ${WEAPONS[id].name}!\nOne cut fells a zombie, and it's\nthe only way to stop a vampire.\n${touch ? 'Tap SLASH to swing' : 'Press X to swing, C to switch'}`,
-      );
-    } else {
-      this.say(`You found ${WEAPONS[id].name}!\n${touch ? 'Tap FIRE' : 'Press X'} to shoot`);
-    }
+    const use = (WEAPONS[id] as WeaponStats).melee
+      ? `${touch ? 'Tap SLASH' : 'Press X'} to swing`
+      : `${touch ? 'Tap FIRE' : 'Press X'} to shoot`;
+    const howTo = equip ? use : touch ? 'Tap the weapons up top to switch' : 'Press C to switch weapons';
+    const about: Partial<Record<WeaponId, string>> = {
+      shotgun: 'Only rock salt stops a ghost,\nbut it bounces off zombies.',
+      machete: "One cut fells a zombie, and it's\nthe only way to stop a vampire.",
+    };
+    this.say([`You found ${WEAPONS[id].name}!`, about[id], howTo].filter(Boolean).join('\n'));
   }
 
   /** Changes to the next weapon the player has picked up. */
