@@ -46,12 +46,14 @@
  * Ladders: the top H of a ladder can be stood on, so a ladder can poke up
  * through a hole in a floor. Press Down on it to climb back down.
  *
- * The route: through the downstairs hall (the gun on the first shelf, the
- * rock salt shotgun on the shelf at the foot of the stairs), up the grand staircase, east along the
- * upstairs landing, up the ladder into the attic for the key, then drop through
- * the broken floorboards, back to the library at the start, pull the loose book
- * to open the secret hatch under the rug, climb down into the cellar, and up into the
- * east wing to the door.
+ * The route: start in the entrance hall (the gun is on the shelf just to the
+ * west, with a zombie waiting at the foot of the stairs), up the grand staircase
+ * to the rock salt shotgun on the landing at the top (before the first ghost,
+ * which haunts the far end of that room), east along the upstairs landing, up the
+ * ladder into the attic for the key, then drop through the broken floorboards,
+ * back down to the library next to the hall, pull the loose book to open the
+ * secret hatch under the rug, climb down into the cellar, and up into the east
+ * wing to the door.
  *
  * The map is a raw string (so \ needs no escaping), split into rows below.
  */
@@ -71,20 +73,20 @@ const MAP = String.raw`
 #%                                     %#             %                 #                 H       %#
 #                         v       ww    #                               #         v       H        #
 #         ww                      ww    #               ww              #           g ww  H        #
-#   c     ww    f   g     c             #               ww    c g   f   # c   f       ww  H c      #
+#   c     ww    f   g     c             #               ww    c    gf   # c   f       ww  H c      #
 #      * *                        **    #                    **         #        * *      H        #
 #     =====                             #                   ====         %      =====     H    *   #
 #                                    b  #                                                 H        #
-#                                    b  #                                   z             H   * *  #
+#                                    b  #              S                    z             H   * *  #
 ######################TT######  ############        /#############TTT###############################
 #%            #%                  #       %        /##%                     #%                     #
 #  c     c    #     v             #               /###      v               #                      #
 #LL    ww   LL#         f   f     #     f        /####        ww            #         f     ww     #
 #LL    ww   LL#           c       #             /#####        ww  c   g   c #               ww    c#
-#LL         LL#     G             #  *S*       /######               * *    #            **        #
+#LL         LL#     G             #  * *       /######               * *    #            **        #
 #LL         LB    =====             =====     /#######              =====               ====       #
 #LL         LL  b               b            /########                        b                    #
-#LLP     a  LL  b     * *   z   b           /###M#####                        b z               D  #
+#LL      a  LL  b     * * P     b        z  /###M#####                        b z               D  #
 ######h###################################################H#####TT##################TTT#############
 #%    H                       v                          %H       v                               %#
 #     H                                                   H                                        #
