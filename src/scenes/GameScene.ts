@@ -372,8 +372,11 @@ export class GameScene extends Phaser.Scene {
       (_b, t) => SOLID.has((t as Phaser.Tilemaps.Tile).index),
     );
 
-    this.physics.add.overlap(this.player, [this.zombies, this.ghosts, this.vampires], (_p, e) =>
-      this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
+    this.physics.add.overlap(
+      this.player,
+      [this.zombies, this.ghosts, this.vampires],
+      (_p, e) => this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
+      (_p, e) => this.touchesHurtbox(e as Sprite),
     );
     this.physics.add.overlap(this.player, gems, (_p, g) => {
       (g as Phaser.Physics.Arcade.Image).destroy();
@@ -1044,6 +1047,22 @@ export class GameScene extends Phaser.Scene {
         }
       }
     });
+  }
+
+  /**
+   * Whether an enemy touching the player can hurt him. With a blade in hand only a smaller
+   * box in the middle of his body counts (the blade's `hurtbox`), so he can get in close
+   * enough to cut; with a gun, or nothing, his whole body does.
+   */
+  private touchesHurtbox(enemy: Sprite): boolean {
+    const id = this.registry.get(REG.weapon) as WeaponId | null;
+    const stats = id ? (WEAPONS[id] as WeaponStats) : null;
+    if (!stats?.melee) return true;
+    const body = this.player.body as Body;
+    const { width, height } = stats.hurtbox;
+    const box = new Phaser.Geom.Rectangle(body.center.x - width / 2, body.bottom - height, width, height);
+    const eb = enemy.body as Body;
+    return Phaser.Geom.Intersects.RectangleToRectangle(box, new Phaser.Geom.Rectangle(eb.x, eb.y, eb.width, eb.height));
   }
 
   private enemyGroups(): Phaser.Physics.Arcade.Group[] {

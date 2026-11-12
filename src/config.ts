@@ -71,6 +71,12 @@ export interface BladeStats extends WeaponBase {
   hitAt: number;
   /** How hard an enemy that survives a cut is knocked back (px/s). */
   knockback: number;
+  /**
+   * While this blade is held, an enemy only hurts the player if it touches this smaller
+   * box (px), so he can get close enough to cut. It sits in the middle of his body, on his
+   * feet. His full body is 8 wide and 22 tall; use those numbers for no shrink.
+   */
+  hurtbox: { width: number; height: number };
 }
 
 export type WeaponStats = GunStats | BladeStats;
@@ -115,10 +121,11 @@ export const WEAPONS = {
     melee: true,
     damage: 20,
     cooldown: 380,
-    reach: 18,
+    reach: 24,
     swingTime: 260,
     hitAt: 90,
     knockback: 170,
+    hurtbox: { width: 4, height: 16 },
     icon: 'machete',
   },
 } satisfies Record<string, WeaponStats>;
