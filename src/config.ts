@@ -276,11 +276,18 @@ export const VAMPIRE = {
   // ---- Lunging --------------------------------------------------------------------
   /** Lunges when the player is this close (px). */
   lungeRange: 3.5 * TILE,
-  /** The crouch before a lunge: the player's warning (ms). */
-  lungeWindup: 420,
+  /**
+   * The warning before a lunge (ms): it rears up hissing with a "!", then crouches
+   * and trembles, flashing red faster and faster. Long enough to see it and jump.
+   */
+  lungeWindup: 900,
+  /** The share of the warning spent rearing up before it drops into the crouch. */
+  warnRearShare: 0.4,
+  /** The red it flashes while it gets ready to lunge. */
+  warnTint: 0xff5070,
   /** Lunge speed (px/s) and how far it goes (px). */
   lungeSpeed: 210,
-  lungeDistance: 3 * TILE,
+  lungeDistance: 5 * TILE,
   /** Stands still after a lunge, open to a cut (ms). */
   lungeRecover: 650,
   /** After a cut that doesn't kill it, it reels back and can't attack for this long (ms). */

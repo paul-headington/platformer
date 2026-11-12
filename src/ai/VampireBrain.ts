@@ -26,6 +26,9 @@ export class VampireBrain {
   private until = 0;
   private lastSeenAt = -Infinity;
   private lungeFromX = 0;
+  private windupFrom = 0;
+  /** How far the sprite has been nudged sideways by the warning tremble (px). */
+  private shake = 0;
   private nextLookAt = 0;
   private readonly postX: number;
 
@@ -74,15 +77,16 @@ export class VampireBrain {
         this.stalk(time, fair);
         break;
       case 'windup':
-        this.stand(VAMPIRE_FRAME.crouch);
+        this.warn(time);
         if (time >= this.until) {
+          this.endWarning();
           this.mode = 'lunge';
           this.lungeFromX = this.v.x;
         }
         break;
       case 'lunge': {
         const gone = Math.abs(this.v.x - this.lungeFromX) >= VAMPIRE.lungeDistance;
-        if (gone || !this.canStep(this.dir) || this.blocked(this.dir) || !this.inTerritory(this.v.x + this.dir * 4)) {
+        if (gone || !this.canStep(this.dir) || this.blocked(this.dir) || !this.inTerritory(this.v.x + this.dir * 4, 2 * TILE)) {
           this.mode = 'recover';
           this.until = time + VAMPIRE.lungeRecover;
           this.stand(VAMPIRE_FRAME.stand, true);
@@ -108,8 +112,37 @@ export class VampireBrain {
     }
   }
 
+  /**
+   * The warning before a lunge, so the player has time to jump: first it rears up and
+   * hisses with its eyes flaring red, then it drops into a crouch and trembles, flashing
+   * red faster and faster, until it springs.
+   */
+  private warn(time: number): void {
+    this.v.setVelocityX(0);
+    this.v.anims.stop();
+    const t = time - this.windupFrom;
+    const rearing = t < VAMPIRE.lungeWindup * VAMPIRE.warnRearShare;
+    this.v.setFrame(rearing ? VAMPIRE_FRAME.hiss : VAMPIRE_FRAME.crouch);
+    // Red flashes that speed up towards the lunge.
+    const left = this.until - time;
+    const period = left > VAMPIRE.lungeWindup / 2 ? 160 : 80;
+    if (Math.floor(t / period) % 2 === 0) this.v.setTint(VAMPIRE.warnTint);
+    else this.v.clearTint();
+    // Crouched, it trembles a pixel either way.
+    const shake = rearing ? 0 : Math.floor(t / 50) % 2 === 0 ? 1 : -1;
+    this.v.x += shake - this.shake;
+    this.shake = shake;
+  }
+
+  private endWarning(): void {
+    this.v.x -= this.shake;
+    this.shake = 0;
+    this.v.clearTint();
+  }
+
   /** The player died or respawned: back to its post. Its wounds stay. */
   forget(): void {
+    if (this.mode === 'windup') this.endWarning();
     if (this.mode === 'stunned') return;
     this.mode = 'return';
     this.lastSeenAt = -Infinity;
@@ -117,6 +150,7 @@ export class VampireBrain {
 
   /** Cut but not killed: reels back away from the blade, hissing. `from` is the side the cut came from. */
   shot(time: number, from = -this.dir): void {
+    if (this.mode === 'windup') this.endWarning();
     this.mode = 'stunned';
     this.until = time + VAMPIRE.stunTime;
     this.lastSeenAt = time;
@@ -161,8 +195,10 @@ export class VampireBrain {
     const level = Math.abs(p.bottom - this.body.bottom) <= TILE;
     if (level && Math.abs(dx) <= VAMPIRE.lungeRange && this.lastSeenAt === time) {
       this.mode = 'windup';
+      this.windupFrom = time;
       this.until = time + VAMPIRE.lungeWindup;
-      this.stand(VAMPIRE_FRAME.crouch);
+      this.stand(VAMPIRE_FRAME.hiss);
+      emote(this.v, this.body.top, EMOTE.spotted);
       return;
     }
     // Follows the player's x, but only as far as its own patch.
@@ -201,8 +237,9 @@ export class VampireBrain {
     this.face(Math.sign(this.world.player.x - this.v.x) || this.dir);
   }
 
-  private inTerritory(x: number): boolean {
-    return Math.abs(x - this.postX) <= VAMPIRE.leash;
+  /** Within its leash of its post; a lunge may carry it `extra` px further. */
+  private inTerritory(x: number, extra = 0): boolean {
+    return Math.abs(x - this.postX) <= VAMPIRE.leash + extra;
   }
 
   private blocked(dir: number): boolean {
