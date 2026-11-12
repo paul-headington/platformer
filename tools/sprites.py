@@ -1075,14 +1075,14 @@ CANDLE_BASE = [
 ]
 CANDLE = ['\n'.join(flame + CANDLE_BASE) for flame in CANDLE_FLAMES]
 
-# Trapdoors. Closed, each is nearly the same as the floor it sits in: the only
-# tells are that the plank joints sit at the edges instead of the middle, and a
-# tiny sunken iron ring. Players have to really look.
+# Trapdoors. Closed, each looks a lot like the floor it sits in, but a careful
+# player can spot it: a dark gap at each edge of the lid, an iron ring, and lid
+# planks a shade darker than the boards around them.
 TRAP_BOARDS = """
-wwwwwwwwwwwwwwww
-xWWWWWWWWWWWWWWx
-xWWkWWWWWWWWWWWx
-xWWWWWWWWWWWWWWx
+kvvvvvvvvvvvvvvk
+kVVVVVrrrVVVVVVk
+kVVVVVrVrVVVVVVk
+kVVVVVRRRVVVVVVk
 xxxxxxxxxxxxxxxx
 qqqqqqqqqqqqqqqq
 qqqqqQqqqqqqqqqq
@@ -1097,15 +1097,15 @@ QQQQQQQQQQQQQQQQ
 QQQQQQQQQQQQQQQQ
 """
 
-# A flagstone that is really a lid: its joint is at the edges, the moss along the floor
-# is broken by a dark crack at each edge, and a small iron ring is set into it.
+# A flagstone that is really a lid: a dark gap at each edge breaks the moss along the
+# floor, and an iron ring is set into it.
 TRAP_FLAG = """
-ammmmmMmmmmmmmMa
-abbbbbbbbbbbbbba
-abbbbbbkkkbbbbba
-abbdbbbkbkbbbbba
-abbbbbbkkkbbbdba
-abbbbbbbbbbbbbba
+kmmmmmMmmmmmmmMk
+kbbbbbbbbbbbbbbk
+kbbbbbbrrrbbbbbk
+kbbdbbbrbrbbbbbk
+kbbbbbbRRRbbbdbk
+kbbbbbbbbbbbbbbk
 dddddddddddddddd
 aaaaaaaaaaaaaaaa
 cccacccccccccacc
@@ -1519,9 +1519,12 @@ CANDLE_PAL = {'o': (255, 160, 48), 'O': (255, 240, 170), 'w': (232, 224, 200), '
               'y': (214, 170, 80), 'Y': (150, 110, 40)}
 SNAKE_PAL = {'G': (28, 70, 34), 'g': (62, 132, 56), 'h': (128, 176, 64), 'y': (196, 186, 96), 'r': (255, 70, 50),
              't': (230, 40, 70), 'f': (236, 236, 220), 'k': (40, 8, 14)}
-TRAP_WOOD_PAL = {**WOOD_PAL, 'k': (52, 34, 30)}
+# Trapdoor cues: a near-black gap all round the lid, an iron ring with a glint on top,
+# and (wood only) lid planks a shade darker than the floor.
+TRAP_RING = {'r': (128, 120, 118), 'R': (62, 56, 58)}
+TRAP_WOOD_PAL = {**WOOD_PAL, **TRAP_RING, 'k': (22, 14, 16), 'v': (140, 96, 62), 'V': (106, 72, 48)}
 TRAP_OPEN_PAL = {**WOOD_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
-TRAP_STONE_PAL = {**CELLAR_STONE_PAL, 'k': (40, 40, 44)}
+TRAP_STONE_PAL = {**CELLAR_STONE_PAL, **TRAP_RING, 'k': (14, 14, 18)}
 TRAP_OPEN_STONE_PAL = {**CELLAR_STONE_PAL, 'k': (8, 6, 10), 'G': (24, 44, 26), 'g': (40, 80, 40)}
 DOOR_PAL = {'a': (82, 76, 104), 'd': (62, 56, 84), 'W': (110, 72, 44), 'x': (70, 44, 28), 'm': (60, 60, 70),
             'y': (230, 190, 70), 'Y': (160, 120, 40), 'k': (10, 6, 10), 'o': (120, 80, 40), 'O': (255, 210, 120)}
