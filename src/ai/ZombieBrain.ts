@@ -102,6 +102,12 @@ export class ZombieBrain {
     this.lastSensedAt = -Infinity;
   }
 
+  /** Shot but not killed: if it hadn't noticed the player yet, it has now. */
+  shot(time: number): void {
+    this.lastSensedAt = time;
+    if (this.mode === 'patrol' && !this.climbing && this.world.playerIsFair()) this.spot(time);
+  }
+
   // ---------------------------------------------------------------- senses
 
   /** Sees the player straight ahead on about the same level, or hears them right next to it. */
@@ -112,7 +118,7 @@ export class ZombieBrain {
     const dx = p.center.x - b.center.x;
     const dy = p.bottom - b.bottom;
     if (Math.hypot(dx, dy) < ZOMBIE.hearing) return true;
-    if (Math.abs(dx) > ZOMBIE.sight || Math.abs(dy) > TILE * 1.5) return false;
+    if (Math.abs(dx) > ZOMBIE.sight || Math.abs(dy) > ZOMBIE.sightHeight) return false;
     // Wandering zombies only see what is in front of them.
     if (this.mode === 'patrol' && Math.sign(dx) !== this.dir && Math.abs(dx) > TILE) return false;
     const eyeRow = Math.floor((b.top + 6) / TILE);
