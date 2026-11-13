@@ -11,7 +11,10 @@ import {
   GAME_WIDTH,
   PLAYER,
   REG,
+  RENDER_SCALE,
   SCORE,
+  SCREEN_ORIGIN,
+  TEXT_RES,
   TILE,
   WEAPON_PICKUPS,
   WEAPONS,
@@ -23,6 +26,7 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
+import { playerAnim } from '../skins';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
 // Tile indexes in the 'tiles' sheet (see TILE_SHEETS in tools/sprites.py).
@@ -169,6 +173,8 @@ export class GameScene extends Phaser.Scene {
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
   private cameraTarget = new Phaser.Math.Vector2();
+  /** High-res copies of tile layers, shown in their place (see tileLayer). */
+  private hdLayers = new Map<Phaser.Tilemaps.TilemapLayer, Phaser.Tilemaps.TilemapLayer>();
   /** The camera's scroll position, eased towards cameraTarget each frame. */
   private cameraPos = new Phaser.Math.Vector2();
   /** No grabbing a ladder again straight after jumping off it. */
@@ -329,8 +335,10 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0);
-    (this.player.body as Body).setSize(8, 22).setOffset(6, 2);
+    // The 'player' texture is high-res (RENDER_SCALE pixels per unit), so the sprite is
+    // scaled down, and its body is sized in the texture's pixels: 8x22 units, 6 in and 2 down.
+    this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0).setScale(1 / RENDER_SCALE);
+    (this.player.body as Body).setSize(8 * RENDER_SCALE, 22 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 2 * RENDER_SCALE);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     const world: ZombieWorld = (this.world = {
@@ -342,7 +350,7 @@ export class GameScene extends Phaser.Scene {
     });
     for (const z of this.zombies.getChildren() as Sprite[]) z.setData('brain', new ZombieBrain(z, world));
     this.useHint = this.add
-      .text(0, 0, 'E', { fontFamily: 'monospace', fontSize: '7px', color: '#fff4c0', backgroundColor: '#1a1026', padding: { x: 2, y: 0 } })
+      .text(0, 0, 'E', { ...TEXT_RES, fontFamily: 'monospace', fontSize: '7px', color: '#fff4c0', backgroundColor: '#1a1026', padding: { x: 2, y: 0 } })
       .setOrigin(0.5, 1)
       .setDepth(12)
       .setAlpha(0.85)
@@ -353,7 +361,7 @@ export class GameScene extends Phaser.Scene {
     // Open bottom edge so falling into a pit is possible.
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
     this.physics.world.setBoundsCollision(true, true, true, false);
-    this.cameras.main.setBounds(0, 0, worldWidth, this.levelHeight);
+    this.cameras.main.setZoom(RENDER_SCALE).setBounds(0, 0, worldWidth, this.levelHeight);
     // Follow a point that tracks the player sideways but only changes height when they land,
     // climb or fall below the floor, so the screen doesn't bob up and down with every jump.
     // It is moved after physics has placed the player each frame, so it is never a frame behind.
@@ -512,7 +520,25 @@ export class GameScene extends Phaser.Scene {
   private tileLayer(data: number[][], sheet: string, depth: number): Phaser.Tilemaps.TilemapLayer {
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const layer = map.createLayer(0, map.addTilesetImage(sheet)!, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+    // With a high-res version of the sheet (tools/art), the game still uses this layer for
+    // collisions, but hides it and shows a high-res copy instead (kept in step by setTile).
+    const hdKey = `${sheet}-hd`;
+    if (this.textures.exists(hdKey)) {
+      const size = TILE * RENDER_SCALE;
+      const hdMap = this.make.tilemap({ data, tileWidth: size, tileHeight: size });
+      const hd = hdMap.createLayer(0, hdMap.addTilesetImage(hdKey)!, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+      hd.setScale(1 / RENDER_SCALE).setDepth(depth);
+      layer.setVisible(false);
+      this.hdLayers.set(layer, hd);
+    }
     return layer.setDepth(depth);
+  }
+
+  /** Changes a tile (a trapdoor opening, say), in its high-res copy too. */
+  private setTile(tile: Phaser.Tilemaps.Tile, index: number): void {
+    tile.index = index;
+    const hd = this.hdLayers.get(tile.tilemapLayer as Phaser.Tilemaps.TilemapLayer)?.getTileAt(tile.x, tile.y, true);
+    if (hd) hd.index = index;
   }
 
   /**
@@ -660,10 +686,10 @@ export class GameScene extends Phaser.Scene {
 
   /** The night sky behind the house, a dark vignette, and the odd flash of lightning. */
   private addAtmosphere(): void {
-    this.add.image(0, 0, 'sky').setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
-    this.add.image(0, 0, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
+    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'sky').setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
+    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
 
-    const flash = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);
+    const flash = this.add.rectangle(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);
     const strike = () => {
       this.tweens.chain({
         targets: flash,
@@ -886,9 +912,9 @@ export class GameScene extends Phaser.Scene {
       p.anims.stop();
       p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
-      p.anims.play(held ? `player-run-${held}` : 'player-run', true);
+      p.anims.play(playerAnim(this, held ? `player-run-${held}` : 'player-run'), true);
     } else {
-      p.anims.play(held ? `player-idle-${held}` : 'player-idle', true);
+      p.anims.play(playerAnim(this, held ? `player-idle-${held}` : 'player-idle'), true);
     }
   }
 
@@ -904,7 +930,7 @@ export class GameScene extends Phaser.Scene {
     body.position.x += ladder.getCenterX() - body.center.x;
     body.position.y += nudgeDown;
     this.player.setVelocity(0, 0);
-    this.player.anims.play('player-climb');
+    this.player.anims.play(playerAnim(this, 'player-climb'));
   }
 
   private stopClimbing(): void {
@@ -1166,7 +1192,7 @@ export class GameScene extends Phaser.Scene {
   /** The lid drops, the player sinks into the dark, and the snakes come up to see. */
   private fallThrough(trap: Trap): void {
     this.sprung = trap;
-    for (const tile of trap.tiles) tile.index = TRAP_OPENS[trap.closed];
+    for (const tile of trap.tiles) this.setTile(tile, TRAP_OPENS[trap.closed]);
     const p = this.player;
     const lives = this.loseLife();
     const floor = trap.tiles[0].pixelY;
@@ -1198,7 +1224,7 @@ export class GameScene extends Phaser.Scene {
 
   private closeTrap(): void {
     if (!this.sprung) return;
-    for (const tile of this.sprung.tiles) tile.index = this.sprung.closed;
+    for (const tile of this.sprung.tiles) this.setTile(tile, this.sprung.closed);
     for (const snake of this.sprung.snakes) snake.setVisible(false);
     this.sprung = null;
   }
@@ -1251,7 +1277,7 @@ export class GameScene extends Phaser.Scene {
     const width = hatch.tiles.length * TILE;
     this.tweens.add({ targets: hatch.rug, x: hatch.rug.x - width - 6, scaleX: 0.75, duration: 500, ease: 'Quad.out' });
     this.time.delayedCall(300, () => {
-      for (const tile of hatch.tiles) tile.index = LADDER_TOP;
+      for (const tile of hatch.tiles) this.setTile(tile, LADDER_TOP);
       hatch.lid.setVisible(true);
       this.tweens.add({ targets: hatch.lid, angle: -100, duration: 450, ease: 'Bounce.out' });
       this.navRows = this.navRows.map((row, ty) =>

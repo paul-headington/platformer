@@ -1,7 +1,24 @@
-/** Shared game constants. Low resolution, scaled up with crisp pixels for a retro look. */
+/**
+ * Shared game constants. The game world is measured in "world units": a tile is TILE units,
+ * and the camera shows GAME_WIDTH x GAME_HEIGHT units. The canvas is RENDER_SCALE times
+ * bigger and every camera is zoomed by RENDER_SCALE, so high-res art (drawn at RENDER_SCALE
+ * pixels per unit) shows at full detail while speeds, sizes and levels keep their units.
+ */
 export const TILE = 16;
 export const GAME_WIDTH = 320;
 export const GAME_HEIGHT = 200;
+export const RENDER_SCALE = 4;
+/** Text style settings that keep small text sharp on the zoomed-in cameras. */
+export const TEXT_RES = { resolution: RENDER_SCALE } as const;
+
+/**
+ * Where an object that ignores the camera's scroll (scroll factor 0) must sit for its top-left
+ * corner to land on the screen's top-left corner, given the main camera zooms around its middle.
+ */
+export const SCREEN_ORIGIN = {
+  x: (GAME_WIDTH * (RENDER_SCALE - 1)) / 2,
+  y: (GAME_HEIGHT * (RENDER_SCALE - 1)) / 2,
+} as const;
 
 export const PLAYER = {
   runSpeed: 110,
@@ -344,10 +361,18 @@ export interface SkinStats {
   name: string;
   /** The sheet in public/sprites. */
   sheet: string;
+  /**
+   * A high-res sheet built by tools/art (npm run art): a grid of PLAYER_FRAME-sized frames,
+   * RENDER_SCALE pixels per world unit, with the extra in-between frames of PLAYER_HD_FRAMES.
+   * Without it the sheet is the old 20x24 pixel-art strip, scaled up with crisp pixels.
+   */
+  hd?: boolean;
+  /** The part of frame 0 shown as the face in the HUD, in high-res pixels: x, y, width, height. */
+  face?: readonly [number, number, number, number];
 }
 
 export const SKINS = {
-  hunter: { name: 'GHOST HUNTER', sheet: 'player.png' },
+  hunter: { name: 'GHOST HUNTER', sheet: 'hd/player-hunter.png', hd: true, face: [14, 2, 52, 44] },
   weaver: { name: 'THE WEAVER', sheet: 'player-weaver.png' },
   ink: { name: 'INK', sheet: 'player-ink.png' },
 } satisfies Record<string, SkinStats>;

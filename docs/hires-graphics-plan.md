@@ -1,6 +1,6 @@
 # High-res graphics upgrade: plan
 
-Status: draft for Paul's approval. Branch: `claude/project-thread-2sirg5`. Nothing is implemented yet.
+Status: approved 2026-11-13. Branch: `claude/project-thread-2sirg5`. Phase 1 (resolution switch) done; phase 2 proof of concept (chibi hunter, entrance hall tiles) in progress.
 
 ## 0. Target style: anime chibi
 

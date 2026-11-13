@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, REG, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
-import { nextSkin } from '../skins';
+import { GAME_HEIGHT, GAME_WIDTH, REG, RENDER_SCALE, TEXT_RES, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
+import { currentSkin, faceCrop, nextSkin } from '../skins';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
 
@@ -12,6 +12,8 @@ export class HudScene extends Phaser.Scene {
   /** A box around the weapon in hand. */
   private weaponMark!: Phaser.GameObjects.Rectangle;
   private keyIcon!: Phaser.GameObjects.Image;
+  /** The player's face beside LIVES. */
+  private face!: Phaser.GameObjects.Image;
   private message!: Phaser.GameObjects.Text;
   /** The touch USE button: only shown while there is something in reach to use. */
   private useButton: Phaser.GameObjects.GameObject[] = [];
@@ -23,13 +25,16 @@ export class HudScene extends Phaser.Scene {
   }
 
   create(): void {
-    const style = { fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' };
+    // Laid out in world units like the game: the camera zooms them up from the top-left corner.
+    this.cameras.main.setOrigin(0, 0).setZoom(RENDER_SCALE);
+    const style = { ...TEXT_RES, fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' };
     this.add.rectangle(0, 0, GAME_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
     this.scoreText = this.add.text(4, 2, '', style);
     this.livesText = this.add.text(124, 2, '', style);
     // The player's face beside LIVES: it shows the skin being worn, and clicking or tapping it
     // (or pressing K) changes skin. It is the head of the player's first frame, so it follows the skin.
-    this.add.image(104, -1, 'player', 0).setOrigin(0, 0).setCrop(4, 1, 13, 11);
+    this.face = this.add.image(0, 0, 'player', 0).setOrigin(0, 0).setScale(1 / RENDER_SCALE);
+    this.showFace();
     this.add.zone(100, 0, 64, 14).setOrigin(0, 0).setInteractive().on('pointerdown', () => this.changeSkin());
     this.input.keyboard?.on('keydown-K', () => this.changeSkin());
     // One icon per weapon, right to left before the key. Tapping or clicking them switches weapons.
@@ -61,7 +66,7 @@ export class HudScene extends Phaser.Scene {
 
     // Faint build version in the bottom-right corner, so it's easy to tell which build is running.
     this.add
-      .text(GAME_WIDTH - 2, GAME_HEIGHT - 1, __VERSION__, { fontFamily: 'monospace', fontSize: '6px', color: '#ffffff' })
+      .text(GAME_WIDTH - 2, GAME_HEIGHT - 1, __VERSION__, { ...TEXT_RES, fontFamily: 'monospace', fontSize: '6px', color: '#ffffff' })
       .setOrigin(1, 1)
       .setAlpha(0.35);
 
@@ -95,8 +100,15 @@ export class HudScene extends Phaser.Scene {
     if (!canUse) pad.release('use');
   }
 
+  /** Crops the player texture to the worn skin's face, with its top-left corner at (108, 0). */
+  private showFace(): void {
+    const [x, y, w, h] = faceCrop(currentSkin(this));
+    this.face.setCrop(x, y, w, h).setPosition(108 - x / RENDER_SCALE, -y / RENDER_SCALE);
+  }
+
   private changeSkin(): void {
     const id = nextSkin(this);
+    this.showFace();
     // Say which skin it is, unless a message that must stay up (game over, say) is showing.
     const current = this.registry.get(REG.message) as HudMessage | undefined;
     if (!current?.sticky || this.message.alpha === 0) {
@@ -141,7 +153,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   private labelFor(x: number, y: number, text: string): Phaser.GameObjects.Text {
-    return this.add.text(x, y, text, { fontFamily: 'monospace', fontSize: '7px', color: '#ffffff' }).setOrigin(0.5);
+    return this.add.text(x, y, text, { ...TEXT_RES, fontFamily: 'monospace', fontSize: '7px', color: '#ffffff' }).setOrigin(0.5);
   }
 
   private touchButton(

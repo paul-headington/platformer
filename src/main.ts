@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, PLAYER } from './config';
+import { GAME_HEIGHT, GAME_WIDTH, PLAYER, RENDER_SCALE } from './config';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
@@ -7,10 +7,14 @@ import { HudScene } from './scenes/HudScene';
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
+  // A high-res canvas; the cameras zoom in by RENDER_SCALE so the world keeps its units.
+  width: GAME_WIDTH * RENDER_SCALE,
+  height: GAME_HEIGHT * RENDER_SCALE,
   backgroundColor: '#1a1026',
-  pixelArt: true,
+  // Smooth filtering for high-res art. Old pixel-art sheets are switched to crisp
+  // (nearest) filtering one by one in BootScene.
+  pixelArt: false,
+  antialias: true,
   roundPixels: true,
   scale: {
     mode: Phaser.Scale.FIT,

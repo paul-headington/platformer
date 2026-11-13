@@ -9,9 +9,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "desktop": "npm run build && electron .",
-    "desktop:dist": "npm run build && electron-builder"
+    "desktop:dist": "npm run build && electron-builder",
+    "art": "node tools/art/build.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "electron": "^45.3.0",
     "electron-builder": "^26.18.0",
     "phaser": "^4.2.1",
