@@ -323,12 +323,12 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case 'D':
-            this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setOrigin(0.5, 1).refreshBody();
+            this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).refreshBody();
             break;
           case 'c': {
             const glow = this.add.image(cx, cy - 4, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setDepth(-1);
             this.tweens.add({ targets: glow, alpha: 0.7, scale: 0.92, duration: 140, yoyo: true, repeat: -1, delay: tx * 37, repeatDelay: 90 });
-            this.add.sprite(cx, cy, 'candle', 0).setDepth(-1).play({ key: 'candle-flicker', startFrame: tx % 3 });
+            this.add.sprite(cx, cy, 'candle', 0).setScale(1 / RENDER_SCALE).setDepth(-1).play({ key: 'candle-flicker', startFrame: tx % 3 });
             break;
           }
           case 'P':
@@ -502,7 +502,7 @@ export class GameScene extends Phaser.Scene {
       const left = tiles[0].pixelX;
       const width = tiles.length * TILE;
       const top = tiles[0].pixelY;
-      const rug = this.add.image(left + width / 2, top, 'rug').setOrigin(0.5, 1).setDepth(1);
+      const rug = this.add.image(left + width / 2, top, 'rug').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setDepth(1);
       const lid = this.add.image(left, top, 'hatch-lid').setOrigin(0, 0).setDisplaySize(width, 3).setDepth(1).setVisible(false);
       this.hatches.push({ tiles, rug, lid });
     }
@@ -510,9 +510,10 @@ export class GameScene extends Phaser.Scene {
 
   /** A loose book on the gap tile of a library bookcase, tied to the hatch nearest it. */
   private addLooseBook(tx: number, ty: number): void {
-    const x = tx * TILE + 7.5;
-    const y = ty * TILE + 15;
-    const book = this.add.image(x, y, 'pull-book').setOrigin(0.5, 1).setDepth(-1.9);
+    // It fills the gap in the painted gap tile (about 1.3 x 5.8 units, its bottom 15.1 down).
+    const x = tx * TILE + 8;
+    const y = ty * TILE + 15.1;
+    const book = this.add.image(x, y, 'pull-book').setOrigin(0.5, 1).setDisplaySize(2.9, 5.8).setDepth(-1.9);
     const dist = (h: Hatch) => Phaser.Math.Distance.Between(x, y, h.tiles[0].getCenterX(), h.tiles[0].pixelY);
     const hatch = this.hatches.slice().sort((a, b) => dist(a) - dist(b))[0];
     // Every few seconds a faint glint runs up its gilt spine: easy to miss, but there to spot.
@@ -721,7 +722,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The night sky behind the house, a dark vignette, and the odd flash of lightning. */
   private addAtmosphere(): void {
-    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'sky').setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
+    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'sky').setScale(1 / RENDER_SCALE).setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
     this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
 
     const flash = this.add.rectangle(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);

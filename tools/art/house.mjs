@@ -3,8 +3,8 @@
 // Each sheet keeps the frame order of the pixel-art sheet it replaces (see TILE_SHEETS in
 // tools/sprites.py); frames not redrawn yet fall back to the old pixel art, scaled up.
 //
-// The tiles and back walls are now painted (Scenario art in art/house/); the vector tiles
-// below are kept for reference. The decor (portraits, bookcase, cobwebs) is still vector.
+// Everything is now painted (Scenario art in art/house/); the vector tiles below are kept
+// for reference.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -218,15 +218,20 @@ function cobweb(right) {
  * A painted tile from art/house/ (Scenario art at 10 px per unit), filling the cell;
  * `mirror` flips it left to right.
  */
-function painted(file, mirror = false) {
-  const href = `data:image/png;base64,${readFileSync(join(PAINTED_DIR, `${file}.png`)).toString('base64')}`;
-  const image = `<image href="${href}" width="${CELL}" height="${CELL}" preserveAspectRatio="none" image-rendering="optimizeQuality"/>`;
+function painted(file, mirror = false, crop = null) {
+  const png = readFileSync(join(PAINTED_DIR, `${file}.png`));
+  const [w, h] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+  const href = `data:image/png;base64,${png.toString('base64')}`;
+  // `crop` picks one tile-sized piece of a bigger picture: [column, row] in tiles of 160 px.
+  const [cx, cy] = crop ?? [0, 0];
+  const [vw, vh] = crop ? [160, 160] : [w, h];
+  const image = `<svg width="${CELL}" height="${CELL}" viewBox="${cx * 160} ${cy * 160} ${vw} ${vh}" preserveAspectRatio="none" overflow="hidden"><image href="${href}" width="${w}" height="${h}" image-rendering="optimizeQuality"/></svg>`;
   return () => (mirror ? g(`translate(${CELL} 0) scale(-1 1)`, image) : image);
 }
 
 /**
  * Frames to draw in high res, per sheet; any other frame falls back to the pixel art.
- * Tiles and back walls are painted (art/house/); the decor is still the vector set above.
+ * Everything is painted (art/house/); the vector tiles above are no longer used.
  */
 export const SHEETS = {
   tiles: {
@@ -245,7 +250,18 @@ export const SHEETS = {
         .map((f, i) => [i, painted(f)]),
     ),
   },
-  decor: { pixel: 'decor.png', frames: { 4: () => cobweb(false), 5: () => cobweb(true), 6: () => portrait(0), 7: () => portrait(1), 8: () => bookcase(false), 9: () => bookcase(true) } },
+  // 0-3 window (a 2x2 picture), 4-5 cobweb (left, right), 6-7 portraits, 8-9 bookcase (top,
+  // bottom), 10 vent, 11-15 library bookcase (top, middle, middle, base, gap), 16 armchair.
+  decor: {
+    pixel: 'decor.png',
+    frames: {
+      0: painted('window', false, [0, 0]), 1: painted('window', false, [1, 0]), 2: painted('window', false, [0, 1]), 3: painted('window', false, [1, 1]),
+      4: painted('cobweb'), 5: painted('cobweb', true), 6: painted('portrait_lady'), 7: painted('portrait_moon'),
+      8: painted('bookcase', false, [0, 0]), 9: painted('bookcase', false, [0, 1]), 10: painted('vent'),
+      11: painted('library_top'), 12: painted('library_mid'), 13: painted('library_mid'), 14: painted('library_base'), 15: painted('library_gap'),
+      16: painted('armchair'),
+    },
+  },
 };
 
 export { t };

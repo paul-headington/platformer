@@ -37,7 +37,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('shotgun', `hd/shotgun.png${v}`);
     this.load.image('salt', `hd/salt.png${v}`);
     this.load.spritesheet('emote', `emote.png${v}`, { frameWidth: 7, frameHeight: 8 });
-    for (const sheet of ['tiles', 'back', 'decor', 'candle']) {
+    for (const sheet of ['tiles', 'back', 'decor']) {
       this.load.spritesheet(sheet, `${sheet}.png${v}`, { frameWidth: TILE, frameHeight: TILE });
     }
     // High-res versions of the tile sheets, from tools/art (npm run art). Where one exists the
@@ -45,14 +45,16 @@ export class BootScene extends Phaser.Scene {
     for (const sheet of ['tiles', 'back', 'decor']) {
       this.load.spritesheet(`${sheet}-hd`, `hd/${sheet}.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * RENDER_SCALE });
     }
-    this.load.spritesheet('door', `door.png${v}`, { frameWidth: TILE, frameHeight: TILE * 2 });
+    // Painted house props, high-res: drawn at 1 / RENDER_SCALE.
+    this.load.spritesheet('candle', `hd/candle.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * RENDER_SCALE });
+    this.load.spritesheet('door', `hd/door.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
     this.load.spritesheet('lurker', `lurker.png${v}`, { frameWidth: TILE * 2, frameHeight: TILE * 2 });
     this.load.spritesheet('tentacle', `tentacle.png${v}`, { frameWidth: TILE * 1.5, frameHeight: TILE * 2 });
     this.load.spritesheet('snake', `snake.png${v}`, { frameWidth: TILE, frameHeight: 20 });
-    this.load.image('sky', `sky.png${v}`);
-    this.load.image('pull-book', `pull-book.png${v}`);
-    this.load.image('rug', `rug.png${v}`);
-    this.load.image('hatch-lid', `hatch-lid.png${v}`);
+    this.load.image('sky', `hd/sky.png${v}`);
+    this.load.image('pull-book', `hd/pull-book.png${v}`);
+    this.load.image('rug', `hd/rug.png${v}`);
+    this.load.image('hatch-lid', `hd/hatch-lid.png${v}`);
   }
 
   create(): void {
