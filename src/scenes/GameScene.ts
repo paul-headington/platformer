@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
-import { VAMPIRE_FRAME, VampireBrain } from '../ai/VampireBrain';
+import { VampireBrain } from '../ai/VampireBrain';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
 import {
   CAMERA,
@@ -11,7 +11,10 @@ import {
   GAME_WIDTH,
   PLAYER,
   REG,
+  RENDER_SCALE,
   SCORE,
+  SCREEN_ORIGIN,
+  TEXT_RES,
   TILE,
   WEAPON_PICKUPS,
   WEAPONS,
@@ -23,6 +26,8 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
+import { playerAnim, playerClip } from '../skins';
+import type { Clip } from '../clips';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
 // Tile indexes in the 'tiles' sheet (see TILE_SHEETS in tools/sprites.py).
@@ -76,15 +81,33 @@ export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 1
 /** A machete swing: the blade goes up, then comes down (frames in the player sheet). */
 const MACHETE_SWING = { raise: 34, strike: 35 } as const;
 /** Zombie sheet frames (see tools/sprites.py). */
-const ZOMBIE_FRAME = { hit: 6, burst: 7, headless: 8 } as const;
 /** A pistol headshot: when the head bursts after the hit (ms), and how many bits fly off. */
-const ZOMBIE_HEADSHOT = { burstAt: 90, bits: 10 } as const;
+const ZOMBIE_HEADSHOT = { burstAt: 0, bits: 10 } as const;
 /** How long a headless zombie lies on the floor before fading, and how long the fade takes (ms). */
 const ZOMBIE_CORPSE = { lie: 1400, fade: 500 } as const;
 /** Gore sheet frames. */
 const GORE = { skin: 0, scalp: 1, eye: 2, goo: 3, tooth: 4 } as const;
 /** How long a burning ghost takes to burn away (ms); the flames take a little longer to die down. */
 const BURN_TIME = 900;
+
+/** Plays a once-through animation from the start, unless it is already on (playing or held at its end). */
+function playOnce(sprite: Phaser.GameObjects.Sprite, key: string): void {
+  if (sprite.anims.currentAnim?.key !== key) sprite.anims.play(key);
+}
+
+/**
+ * The frame of a video swing clip `elapsed` ms into a swing: the wind-up runs until the
+ * blade's hitAt, when the clip reaches its hitFrame, and the follow-through fills the rest.
+ */
+function swingFrame(clip: Clip, elapsed: number, blade: BladeStats): number {
+  const n = clip.frames.length;
+  const hit = clip.hitFrame ?? Math.floor(n / 2);
+  const i =
+    elapsed < blade.hitAt
+      ? (elapsed / blade.hitAt) * hit
+      : hit + ((elapsed - blade.hitAt) / (blade.swingTime - blade.hitAt)) * (n - hit);
+  return clip.frames[Phaser.Math.Clamp(Math.floor(i), 0, n - 1)];
+}
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -160,6 +183,11 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   /** The swing in progress, if any: when it started and when it ends. */
   private swingStartedAt = -Infinity;
+  /** Landing: the player was in the air last frame, and has just come down. */
+  private wasAirborne = false;
+  private landed = false;
+  /** A shot was fired since the last frame: its clip starts (when standing). */
+  private fired = false;
   private swingUntil = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
@@ -169,6 +197,8 @@ export class GameScene extends Phaser.Scene {
   private onStairs = false;
   /** What the camera follows: the player's x, but the height of the floor they last stood on. */
   private cameraTarget = new Phaser.Math.Vector2();
+  /** High-res copies of tile layers, shown in their place (see tileLayer). */
+  private hdLayers = new Map<Phaser.Tilemaps.TilemapLayer, Phaser.Tilemaps.TilemapLayer>();
   /** The camera's scroll position, eased towards cameraTarget each frame. */
   private cameraPos = new Phaser.Math.Vector2();
   /** No grabbing a ladder again straight after jumping off it. */
@@ -270,35 +300,35 @@ export class GameScene extends Phaser.Scene {
         const bottom = (ty + 1) * TILE;
         if (ch in WEAPON_PICKUPS) {
           const weapon = WEAPON_PICKUPS[ch];
-          weaponPickups.push({ image: this.physics.add.staticImage(cx, cy + 4, WEAPONS[weapon].icon), weapon });
+          weaponPickups.push({ image: this.physics.add.staticImage(cx, cy + 4, WEAPONS[weapon].icon).setScale(1 / RENDER_SCALE).refreshBody(), weapon });
         }
         switch (ch) {
           case '*': {
-            const gem = gems.create(cx, cy, 'gem') as Sprite;
+            const gem = (gems.create(cx, cy, 'gem') as Sprite).setScale(1 / RENDER_SCALE).refreshBody();
             gem.play({ key: 'gem-sparkle', startFrame: tx % 4 });
             this.tweens.add({ targets: gem, y: cy - 2, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: tx * 40 });
             break;
           }
           case 'K':
-            key = this.physics.add.staticImage(cx, cy, 'key');
+            key = this.physics.add.staticImage(cx, cy, 'key').setScale(1 / RENDER_SCALE).refreshBody();
             this.tweens.add({ targets: key, y: cy - 3, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
             break;
           case 'J': {
             // Sits on the floor, with a slow bob and a faint glow so it reads as a pickup.
             const glow = this.add.image(cx, bottom - 6, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setDepth(-1);
             this.tweens.add({ targets: glow, alpha: 0.25, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-            const jacket = this.physics.add.staticImage(cx, bottom - 7, 'jacket').setData('glow', glow);
+            const jacket = this.physics.add.staticImage(cx, bottom - 7, 'jacket').setScale(1 / RENDER_SCALE).refreshBody().setData('glow', glow);
             this.tweens.add({ targets: jacket, y: bottom - 9, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
             jackets.push(jacket);
             break;
           }
           case 'D':
-            this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setOrigin(0.5, 1).refreshBody();
+            this.door = this.physics.add.staticImage(cx, bottom, 'door', 0).setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).refreshBody();
             break;
           case 'c': {
             const glow = this.add.image(cx, cy - 4, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setDepth(-1);
             this.tweens.add({ targets: glow, alpha: 0.7, scale: 0.92, duration: 140, yoyo: true, repeat: -1, delay: tx * 37, repeatDelay: 90 });
-            this.add.sprite(cx, cy, 'candle', 0).setDepth(-1).play({ key: 'candle-flicker', startFrame: tx % 3 });
+            this.add.sprite(cx, cy, 'candle', 0).setScale(1 / RENDER_SCALE).setDepth(-1).play({ key: 'candle-flicker', startFrame: tx % 3 });
             break;
           }
           case 'P':
@@ -308,20 +338,22 @@ export class GameScene extends Phaser.Scene {
             this.addLooseBook(tx, ty);
             break;
           case 'z': {
-            const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
-            (z.body as Body).setSize(8, 21).setOffset(6, 3);
+            // High-res like the player: drawn at 1 / RENDER_SCALE, its body sized in texture pixels.
+            const z = (this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (z.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
             this.setEnemy(z, 'zombie').play('zombie-walk');
             break;
           }
           case 'g': {
-            const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
-            (gh.body as Body).setSize(12, 12).setOffset(4, 3);
+            // High-res: a 20x24-unit cell (the old ghost was 20x20, so the body sits 2 lower in it).
+            const gh = (this.ghosts.create(cx, cy, 'ghost', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (gh.body as Body).setSize(12 * RENDER_SCALE, 12 * RENDER_SCALE).setOffset(4 * RENDER_SCALE, 5 * RENDER_SCALE);
             this.setEnemy(gh, 'ghost').setData('phase', tx).setAlpha(0.85).play('ghost-float');
             break;
           }
           case 'V': {
-            const v = this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite;
-            (v.body as Body).setSize(8, 21).setOffset(6, 3);
+            const v = (this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (v.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
             this.setEnemy(v, 'vampire').play('vampire-idle');
             break;
           }
@@ -329,8 +361,10 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0);
-    (this.player.body as Body).setSize(8, 22).setOffset(6, 2);
+    // The 'player' texture is high-res (RENDER_SCALE pixels per unit), so the sprite is
+    // scaled down, and its body is sized in the texture's pixels: 8x22 units, 6 in and 2 down.
+    this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0).setScale(1 / RENDER_SCALE);
+    (this.player.body as Body).setSize(8 * RENDER_SCALE, 22 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 2 * RENDER_SCALE);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     const world: ZombieWorld = (this.world = {
@@ -342,7 +376,7 @@ export class GameScene extends Phaser.Scene {
     });
     for (const z of this.zombies.getChildren() as Sprite[]) z.setData('brain', new ZombieBrain(z, world));
     this.useHint = this.add
-      .text(0, 0, 'E', { fontFamily: 'monospace', fontSize: '7px', color: '#fff4c0', backgroundColor: '#1a1026', padding: { x: 2, y: 0 } })
+      .text(0, 0, 'E', { ...TEXT_RES, fontFamily: 'monospace', fontSize: '7px', color: '#fff4c0', backgroundColor: '#1a1026', padding: { x: 2, y: 0 } })
       .setOrigin(0.5, 1)
       .setDepth(12)
       .setAlpha(0.85)
@@ -353,7 +387,7 @@ export class GameScene extends Phaser.Scene {
     // Open bottom edge so falling into a pit is possible.
     this.physics.world.setBounds(0, 0, worldWidth, this.levelHeight + TILE * 6);
     this.physics.world.setBoundsCollision(true, true, true, false);
-    this.cameras.main.setBounds(0, 0, worldWidth, this.levelHeight);
+    this.cameras.main.setZoom(RENDER_SCALE).setBounds(0, 0, worldWidth, this.levelHeight);
     // Follow a point that tracks the player sideways but only changes height when they land,
     // climb or fall below the floor, so the screen doesn't bob up and down with every jump.
     // It is moved after physics has placed the player each frame, so it is never a frame behind.
@@ -375,7 +409,16 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(
       this.player,
       [this.zombies, this.ghosts, this.vampires],
-      (_p, e) => this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
+      (_p, e) => {
+        const enemy = e as Sprite;
+        this.hurt(false, (enemy.getData('stats') as EnemyStats).damage);
+        // A zombie or ghost that catches the player swipes at them.
+        const type = enemy.getData('type') as EnemyType;
+        if (this.state === 'dying' && (type === 'zombie' || type === 'ghost') && enemy.anims.currentAnim?.key !== `${type}-attack`) {
+          enemy.play(`${type}-attack`);
+          if (type === 'ghost') enemy.anims.chain('ghost-float');
+        }
+      },
       (_p, e) => this.touchesHurtbox(e as Sprite),
     );
     this.physics.add.overlap(this.player, gems, (_p, g) => {
@@ -437,7 +480,7 @@ export class GameScene extends Phaser.Scene {
         this.traps.push(current);
       }
       current.tiles.push(tile);
-      const snake = this.add.sprite(tile.getCenterX(), tile.pixelY + 3, 'snake', 0).setOrigin(0.5, 1).setDepth(11);
+      const snake = this.add.sprite(tile.getCenterX(), tile.pixelY + 3, 'snake', 0).setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setDepth(11);
       current.snakes.push(snake.setFlipX(tile.x % 2 === 1).setVisible(false));
     });
   }
@@ -459,7 +502,7 @@ export class GameScene extends Phaser.Scene {
       const left = tiles[0].pixelX;
       const width = tiles.length * TILE;
       const top = tiles[0].pixelY;
-      const rug = this.add.image(left + width / 2, top, 'rug').setOrigin(0.5, 1).setDepth(1);
+      const rug = this.add.image(left + width / 2, top, 'rug').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setDepth(1);
       const lid = this.add.image(left, top, 'hatch-lid').setOrigin(0, 0).setDisplaySize(width, 3).setDepth(1).setVisible(false);
       this.hatches.push({ tiles, rug, lid });
     }
@@ -467,9 +510,10 @@ export class GameScene extends Phaser.Scene {
 
   /** A loose book on the gap tile of a library bookcase, tied to the hatch nearest it. */
   private addLooseBook(tx: number, ty: number): void {
-    const x = tx * TILE + 7.5;
-    const y = ty * TILE + 15;
-    const book = this.add.image(x, y, 'pull-book').setOrigin(0.5, 1).setDepth(-1.9);
+    // It fills the gap in the painted gap tile (about 1.3 x 5.8 units, its bottom 15.1 down).
+    const x = tx * TILE + 8;
+    const y = ty * TILE + 15.1;
+    const book = this.add.image(x, y, 'pull-book').setOrigin(0.5, 1).setDisplaySize(2.9, 5.8).setDepth(-1.9);
     const dist = (h: Hatch) => Phaser.Math.Distance.Between(x, y, h.tiles[0].getCenterX(), h.tiles[0].pixelY);
     const hatch = this.hatches.slice().sort((a, b) => dist(a) - dist(b))[0];
     // Every few seconds a faint glint runs up its gilt spine: easy to miss, but there to spot.
@@ -512,7 +556,25 @@ export class GameScene extends Phaser.Scene {
   private tileLayer(data: number[][], sheet: string, depth: number): Phaser.Tilemaps.TilemapLayer {
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const layer = map.createLayer(0, map.addTilesetImage(sheet)!, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+    // With a high-res version of the sheet (tools/art), the game still uses this layer for
+    // collisions, but hides it and shows a high-res copy instead (kept in step by setTile).
+    const hdKey = `${sheet}-hd`;
+    if (this.textures.exists(hdKey)) {
+      const size = TILE * RENDER_SCALE;
+      const hdMap = this.make.tilemap({ data, tileWidth: size, tileHeight: size });
+      const hd = hdMap.createLayer(0, hdMap.addTilesetImage(hdKey)!, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+      hd.setScale(1 / RENDER_SCALE).setDepth(depth);
+      layer.setVisible(false);
+      this.hdLayers.set(layer, hd);
+    }
     return layer.setDepth(depth);
+  }
+
+  /** Changes a tile (a trapdoor opening, say), in its high-res copy too. */
+  private setTile(tile: Phaser.Tilemaps.Tile, index: number): void {
+    tile.index = index;
+    const hd = this.hdLayers.get(tile.tilemapLayer as Phaser.Tilemaps.TilemapLayer)?.getTileAt(tile.x, tile.y, true);
+    if (hd) hd.index = index;
   }
 
   /**
@@ -582,7 +644,7 @@ export class GameScene extends Phaser.Scene {
    * it really looks like it comes out of the duct. It hides if the player is close.
    */
   private addTentacle(left: number, top: number): void {
-    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setOrigin(0, 0).setDepth(-2.5);
+    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setScale(1 / RENDER_SCALE).setOrigin(0, 0).setDepth(-2.5);
     const tooClose = () => Math.abs(this.player.x - left - 8) < TILE * 2 && Math.abs(this.player.y - top - 16) < TILE * 3;
     const out = [1, 2, 3, 4, 3, 5, 4, 3, 5, 4, 3];
     // Where the tip of the tentacle is in each frame, relative to the vent's top-left.
@@ -631,7 +693,7 @@ export class GameScene extends Phaser.Scene {
    */
   private addLurker(left: number, bottom: number): void {
     const FRAME = { dark: 0, eyes: 1, blink: 2, left: 3, right: 4, fingers: 5 };
-    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setOrigin(0, 1).setDepth(1);
+    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setScale(1 / RENDER_SCALE).setOrigin(0, 1).setDepth(1);
     const cx = left + 20;
     const tooClose = () => Math.abs(this.player.x - cx) < TILE * 3 && Math.abs(this.player.y - bottom) < TILE * 3;
     const look = () => (this.player.x < cx - TILE ? FRAME.left : this.player.x > cx + TILE ? FRAME.right : FRAME.eyes);
@@ -660,10 +722,10 @@ export class GameScene extends Phaser.Scene {
 
   /** The night sky behind the house, a dark vignette, and the odd flash of lightning. */
   private addAtmosphere(): void {
-    this.add.image(0, 0, 'sky').setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
-    this.add.image(0, 0, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
+    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'sky').setScale(1 / RENDER_SCALE).setOrigin(0, 0).setScrollFactor(0.1).setDepth(-10);
+    this.add.image(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, 'vignette').setOrigin(0, 0).setScrollFactor(0).setDepth(50);
 
-    const flash = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);
+    const flash = this.add.rectangle(SCREEN_ORIGIN.x, SCREEN_ORIGIN.y, GAME_WIDTH, GAME_HEIGHT, 0xc8d0ff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(49);
     const strike = () => {
       this.tweens.chain({
         targets: flash,
@@ -807,7 +869,7 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     return axis === 'x'
       ? cam.clampX(this.cameraTarget.x - cam.width / 2)
-      : cam.clampY(this.cameraTarget.y - cam.height / 2);
+      : cam.clampY(this.cameraTarget.y - CAMERA.lookUp - cam.height / 2);
   }
 
   private updatePlayer(time: number): void {
@@ -878,18 +940,39 @@ export class GameScene extends Phaser.Scene {
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     const held = this.heldWeapon();
+    // A skin with video clips has its own jump, fall and landing (the same with or without
+    // a weapon), armed idles, and a clip for each gun firing.
+    const rise = body.velocity.y < 0;
+    const airClip = playerClip(this, rise ? 'jump' : 'fall');
+    const land = playerClip(this, 'land') && playerAnim(this, 'player-land');
+    const fireAnim = held && playerClip(this, `fire-${held}`) && playerAnim(this, `player-fire-${held}`);
+    /** True while a once-through animation is still going. */
+    const going = (key: string) => p.anims.currentAnim?.key === key && p.anims.isPlaying;
+    if (onGround && this.wasAirborne && land) this.landed = true;
+    this.wasAirborne = !onGround;
     if (time < this.swingUntil) {
       p.anims.stop();
-      const hitAt = (WEAPONS.machete as BladeStats).hitAt;
-      p.setFrame(time - this.swingStartedAt < hitAt ? MACHETE_SWING.raise : MACHETE_SWING.strike);
+      const blade = WEAPONS.machete as BladeStats;
+      const swing = playerClip(this, 'swing');
+      if (swing) p.setFrame(swingFrame(swing, time - this.swingStartedAt, blade));
+      else p.setFrame(time - this.swingStartedAt < blade.hitAt ? MACHETE_SWING.raise : MACHETE_SWING.strike);
+    } else if (!onGround && airClip) {
+      playOnce(p, playerAnim(this, rise ? 'player-jump' : 'player-fall'));
     } else if (!onGround) {
       p.anims.stop();
-      p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
+      p.setFrame((rise ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
-      p.anims.play(held ? `player-run-${held}` : 'player-run', true);
+      p.anims.play(playerAnim(this, held ? `player-run-${held}` : 'player-run'), true);
+    } else if (fireAnim && this.fired) {
+      p.anims.play(fireAnim); // from the start, even mid-way through the last shot's clip
+    } else if (fireAnim && going(fireAnim)) {
+      // Let the shot's clip finish.
+    } else if (land && (this.landed || going(land))) {
+      playOnce(p, land);
     } else {
-      p.anims.play(held ? `player-idle-${held}` : 'player-idle', true);
+      p.anims.play(playerAnim(this, held ? `player-idle-${held}` : 'player-idle'), true);
     }
+    this.fired = this.landed = false;
   }
 
   // ---------------------------------------------------------------- ladders
@@ -904,7 +987,7 @@ export class GameScene extends Phaser.Scene {
     body.position.x += ladder.getCenterX() - body.center.x;
     body.position.y += nudgeDown;
     this.player.setVelocity(0, 0);
-    this.player.anims.play('player-climb');
+    this.player.anims.play(playerAnim(this, 'player-climb'));
   }
 
   private stopClimbing(): void {
@@ -1000,6 +1083,7 @@ export class GameScene extends Phaser.Scene {
     const live = (this.bullets.getChildren() as Sprite[]).filter((b) => b.getData('weapon') === id).length;
     if (live >= weapon.maxOnScreen * weapon.pellets) return;
     this.lastShotAt = time;
+    this.fired = true;
     const dir = this.player.flipX ? -1 : 1;
     const x = this.player.x + dir * 10;
     const y = this.player.y + 1;
@@ -1007,7 +1091,7 @@ export class GameScene extends Phaser.Scene {
       // Pellets fan out evenly from the top of the spread to the bottom.
       const angle = weapon.pellets === 1 ? 0 : weapon.spread * (i / (weapon.pellets - 1) - 0.5);
       const rad = Phaser.Math.DegToRad(angle);
-      const b = this.bullets.create(x, y, weapon.bullet) as Sprite;
+      const b = (this.bullets.create(x, y, weapon.bullet) as Sprite).setScale(1 / RENDER_SCALE);
       b.setData({ weapon: id, fromX: x, fromY: y, passed: [] as Sprite[] });
       b.setVelocity(dir * weapon.speed * Math.cos(rad), weapon.speed * Math.sin(rad));
     }
@@ -1106,7 +1190,7 @@ export class GameScene extends Phaser.Scene {
       const back = (bullet.body as Body).velocity.x > 0 ? -1 : 1;
       const key = bullet.texture.key;
       bullet.destroy();
-      const grain = this.add.image(x, y, key).setDepth(9);
+      const grain = this.add.image(x, y, key).setScale(1 / RENDER_SCALE).setDepth(9);
       this.tweens.add({ targets: grain, x: x + back * Phaser.Math.Between(6, 14), y: y + 10, alpha: 0, angle: back * 90, duration: 300, ease: 'Quad.in', onComplete: () => grain.destroy() });
     }
 
@@ -1166,7 +1250,7 @@ export class GameScene extends Phaser.Scene {
   /** The lid drops, the player sinks into the dark, and the snakes come up to see. */
   private fallThrough(trap: Trap): void {
     this.sprung = trap;
-    for (const tile of trap.tiles) tile.index = TRAP_OPENS[trap.closed];
+    for (const tile of trap.tiles) this.setTile(tile, TRAP_OPENS[trap.closed]);
     const p = this.player;
     const lives = this.loseLife();
     const floor = trap.tiles[0].pixelY;
@@ -1198,7 +1282,7 @@ export class GameScene extends Phaser.Scene {
 
   private closeTrap(): void {
     if (!this.sprung) return;
-    for (const tile of this.sprung.tiles) tile.index = this.sprung.closed;
+    for (const tile of this.sprung.tiles) this.setTile(tile, this.sprung.closed);
     for (const snake of this.sprung.snakes) snake.setVisible(false);
     this.sprung = null;
   }
@@ -1251,7 +1335,7 @@ export class GameScene extends Phaser.Scene {
     const width = hatch.tiles.length * TILE;
     this.tweens.add({ targets: hatch.rug, x: hatch.rug.x - width - 6, scaleX: 0.75, duration: 500, ease: 'Quad.out' });
     this.time.delayedCall(300, () => {
-      for (const tile of hatch.tiles) tile.index = LADDER_TOP;
+      for (const tile of hatch.tiles) this.setTile(tile, LADDER_TOP);
       hatch.lid.setVisible(true);
       this.tweens.add({ targets: hatch.lid, angle: -100, duration: 450, ease: 'Bounce.out' });
       this.navRows = this.navRows.map((row, ty) =>
@@ -1288,8 +1372,17 @@ export class GameScene extends Phaser.Scene {
     if (!force && this.time.now < this.invulnerableUntil) return;
 
     const lives = this.loseLife(damage);
-    this.player.anims.stop();
-    this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
+    // A skin with video clips flinches, or on the last life falls down dead where it stands.
+    const clip = lives > 0 ? 'hurt' : 'death';
+    if (playerClip(this, clip)) {
+      this.player.anims.play(playerAnim(this, `player-${clip}`));
+      this.player.setTint(0xff9a9a);
+      if (lives > 0) this.player.setVelocity(0, -220);
+      else (this.player.body as Body).moves = false;
+    } else {
+      this.player.anims.stop();
+      this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
+    }
     this.cameras.main.shake(150, 0.01);
 
     this.time.delayedCall(1000, () => (lives > 0 ? this.respawn() : this.gameOver()));
@@ -1313,7 +1406,8 @@ export class GameScene extends Phaser.Scene {
   private gameOver(): void {
     this.state = 'over';
     pad.clearPresses();
-    this.player.setVisible(false);
+    // He lies where he fell when the skin has a death clip; otherwise he has dropped off screen.
+    if (!playerClip(this, 'death')) this.player.setVisible(false);
     this.say(`GAME OVER\n${this.isTouch() ? 'Tap' : 'Press Enter'} to try again`, true);
   }
 
@@ -1356,6 +1450,8 @@ export class GameScene extends Phaser.Scene {
       const brain = enemy.getData('brain') as ZombieBrain | GhostBrain | VampireBrain;
       if (brain instanceof VampireBrain) brain.shot(this.time.now, from || undefined);
       else brain.shot(this.time.now);
+      if (brain instanceof ZombieBrain) enemy.play('zombie-hurt');
+      if (brain instanceof GhostBrain) enemy.play('ghost-hurt').anims.chain('ghost-float');
       return;
     }
     this.killEnemy(enemy, from, weapon);
@@ -1372,7 +1468,7 @@ export class GameScene extends Phaser.Scene {
       this.blowHeadOff(enemy, from, weapon !== undefined && !!(WEAPONS[weapon] as WeaponStats).melee);
       return;
     }
-    const body = this.add.image(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
+    const body = this.add.sprite(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setScale(enemy.scaleX).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
     enemy.destroy();
     if (stats.death === 'burn') this.burnUp(body);
     else this.tweens.add({ targets: body, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => body.destroy() });
@@ -1389,8 +1485,9 @@ export class GameScene extends Phaser.Scene {
     const flip = enemy.flipX;
     const x = enemy.x;
     enemy.destroy();
-    const body = this.add.image(x, feet, 'vampire', VAMPIRE_FRAME.headless).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
-    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setFlipX(flip).setDepth(6);
+    // The death clip starts headless: the body twitches, greys and crumbles to an ash pile.
+    const body = this.add.sprite(x, feet, 'vampire').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setFlipX(flip).setDepth(5).play('vampire-death');
+    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
     this.cameras.main.shake(140, 0.006);
 
     // The head: up, over and down to the floor, spinning, then a short roll.
@@ -1419,9 +1516,10 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => drop.destroy(),
       });
     }
-    // The body sways, its knees go, and it crumbles to dust.
-    this.tweens.add({ targets: body, angle: -away * 6, duration: 300, yoyo: true, delay: 150 });
-    this.time.delayedCall(700, () => this.crumble(body, feet, 700));
+    // The ash pile lingers, then fades.
+    body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.tweens.add({ targets: body, alpha: 0, delay: 1200, duration: 600, onComplete: () => body.destroy() });
+    });
     this.time.delayedCall(900, () => this.say('The vampire crumbles to dust!\nThe way out is clear.'));
   }
 
@@ -1440,15 +1538,16 @@ export class GameScene extends Phaser.Scene {
     const neckY = feet - 15;
     enemy.destroy();
 
-    const body = this.add.sprite(x, feet, 'zombie', ZOMBIE_FRAME.hit).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
-    body.play(cut ? 'zombie-headless' : 'zombie-headshot');
+    // The death clip starts headless: smoke at the neck, a stumble, then flat on its face.
+    const body = this.add.sprite(x, feet, 'zombie').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
+    body.play('zombie-death');
     body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       this.tweens.add({ targets: body, alpha: 0, delay: ZOMBIE_CORPSE.lie, duration: ZOMBIE_CORPSE.fade, onComplete: () => body.destroy() });
     });
 
     if (cut) {
       // The head flies off whole, spinning, and rolls to a stop.
-      const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setFlipX(flip).setDepth(6);
+      const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
       const landX = x + away * 28;
       this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 600, ease: 'Linear' });
       this.tweens.chain({
@@ -1467,7 +1566,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // The head bursts a moment after the bullet lands (frame 6 is the hit, frame 7 the burst).
+    // The head bursts as the bullet lands (the death clip starts headless).
     this.time.delayedCall(ZOMBIE_HEADSHOT.burstAt, () => {
       this.cameras.main.shake(90, 0.004);
       this.splatter(x, neckY - 4, feet, away, ZOMBIE_HEADSHOT.bits,
@@ -1531,33 +1630,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The rock salt sets a ghost alight: it flares up in flames, glows red and
-   * shrivels away while the fire roars, then the fire dies down and embers float off.
+   * The rock salt sets a ghost alight: she catches fire from the tail up and burns to
+   * embers (her death clip), under a flickering warm glow.
    */
-  private burnUp(ghost: Phaser.GameObjects.Image): void {
+  private burnUp(ghost: Phaser.GameObjects.Sprite): void {
     const { x, y } = ghost;
-    ghost.setTint(0xffa060).setDepth(7);
-    this.tweens.add({ targets: ghost, y: y - 6, scaleX: 0.5, scaleY: 0.8, alpha: 0, duration: BURN_TIME, ease: 'Quad.in', onComplete: () => ghost.destroy() });
-
-    const fire = this.add.sprite(x, y + 8, 'fire', 0).setOrigin(0.5, 1).setDepth(6).play('fire-burn');
-    fire.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => fire.destroy());
+    ghost.setDepth(7).setAlpha(1).play('ghost-death');
+    ghost.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => ghost.destroy());
 
     const glow = this.add.image(x, y, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setScale(1.3).setDepth(4);
     this.tweens.add({ targets: glow, alpha: 0.6, scale: 1.15, duration: 90, yoyo: true, repeat: 4 });
     this.tweens.add({ targets: glow, alpha: 0, delay: BURN_TIME, duration: 400, onComplete: () => glow.destroy() });
-
-    for (let i = 0; i < 8; i++) {
-      const ember = this.add.image(x + Phaser.Math.Between(-6, 6), y + Phaser.Math.Between(-2, 6), 'ember').setDepth(8);
-      this.tweens.add({
-        targets: ember,
-        x: ember.x + Phaser.Math.Between(-10, 10),
-        y: ember.y - Phaser.Math.Between(18, 34),
-        alpha: 0,
-        delay: Phaser.Math.Between(0, BURN_TIME),
-        duration: Phaser.Math.Between(500, 900),
-        onComplete: () => ember.destroy(),
-      });
-    }
   }
 
   private isTouch(): boolean {

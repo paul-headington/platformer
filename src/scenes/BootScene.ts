@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, TILE } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TILE } from '../config';
 import { PLAYER_HOLDING } from './GameScene';
-import { createPlayerTexture, loadSkins } from '../skins';
+import { createPlayerAnims, createPlayerTexture, loadSkins } from '../skins';
+import { ENEMY_CLIPS, createClipAnims } from '../clips';
 
 /**
  * Loads the sprite sheets from public/sprites (all built by tools/sprites.py)
@@ -19,37 +20,51 @@ export class BootScene extends Phaser.Scene {
     const v = `?v=${__BUILD_ID__}`;
     // Every player skin; the 'player' texture is made from the chosen one in create().
     loadSkins(this.load, v);
-    this.load.spritesheet('zombie', `zombie.png${v}`, { frameWidth: 20, frameHeight: 24 });
-    this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
-    this.load.image('vampire-head', `vampire-head.png${v}`);
-    this.load.image('zombie-head', `zombie-head.png${v}`);
+    // High-res, like the player: cells of 20x24 units at RENDER_SCALE (see tools/art).
+    this.load.spritesheet('zombie', `hd/zombie.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    this.load.spritesheet('vampire', `hd/vampire.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    this.load.image('vampire-head', `hd/vampire-head.png${v}`);
+    this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
-    this.load.image('machete', `machete.png${v}`);
-    this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
-    this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
-    this.load.image('key', `key.png${v}`);
-    this.load.image('jacket', `jacket.png${v}`);
-    this.load.image('gun', `gun.png${v}`);
-    this.load.image('bullet', `bullet.png${v}`);
-    this.load.image('shotgun', `shotgun.png${v}`);
-    this.load.image('salt', `salt.png${v}`);
-    this.load.spritesheet('fire', `fire.png${v}`, { frameWidth: 20, frameHeight: 26 });
-    this.load.image('ember', `ember.png${v}`);
+    // Pickups and shots are high-res: drawn at 1 / RENDER_SCALE.
+    this.load.image('machete', `hd/machete.png${v}`);
+    this.load.spritesheet('ghost', `hd/ghost.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    this.load.spritesheet('gem', `hd/gem.png${v}`, { frameWidth: 8 * RENDER_SCALE, frameHeight: 8 * RENDER_SCALE });
+    this.load.image('key', `hd/key.png${v}`);
+    this.load.image('jacket', `hd/jacket.png${v}`);
+    this.load.image('gun', `hd/gun.png${v}`);
+    this.load.image('bullet', `hd/bullet.png${v}`);
+    this.load.image('shotgun', `hd/shotgun.png${v}`);
+    this.load.image('salt', `hd/salt.png${v}`);
     this.load.spritesheet('emote', `emote.png${v}`, { frameWidth: 7, frameHeight: 8 });
-    for (const sheet of ['tiles', 'back', 'decor', 'candle']) {
+    for (const sheet of ['tiles', 'back', 'decor']) {
       this.load.spritesheet(sheet, `${sheet}.png${v}`, { frameWidth: TILE, frameHeight: TILE });
     }
-    this.load.spritesheet('door', `door.png${v}`, { frameWidth: TILE, frameHeight: TILE * 2 });
-    this.load.spritesheet('lurker', `lurker.png${v}`, { frameWidth: TILE * 2, frameHeight: TILE * 2 });
-    this.load.spritesheet('tentacle', `tentacle.png${v}`, { frameWidth: TILE * 1.5, frameHeight: TILE * 2 });
-    this.load.spritesheet('snake', `snake.png${v}`, { frameWidth: TILE, frameHeight: 20 });
-    this.load.image('sky', `sky.png${v}`);
-    this.load.image('pull-book', `pull-book.png${v}`);
-    this.load.image('rug', `rug.png${v}`);
-    this.load.image('hatch-lid', `hatch-lid.png${v}`);
+    // High-res versions of the tile sheets, from tools/art (npm run art). Where one exists the
+    // game shows it in place of the pixel-art sheet.
+    for (const sheet of ['tiles', 'back', 'decor']) {
+      this.load.spritesheet(`${sheet}-hd`, `hd/${sheet}.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * RENDER_SCALE });
+    }
+    // Painted house props, high-res: drawn at 1 / RENDER_SCALE.
+    this.load.spritesheet('candle', `hd/candle.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * RENDER_SCALE });
+    this.load.spritesheet('door', `hd/door.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
+    this.load.spritesheet('lurker', `hd/lurker.png${v}`, { frameWidth: TILE * 2 * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
+    this.load.spritesheet('tentacle', `hd/tentacle.png${v}`, { frameWidth: TILE * 1.5 * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
+    this.load.spritesheet('snake', `hd/snake.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: 20 * RENDER_SCALE });
+    this.load.image('sky', `hd/sky.png${v}`);
+    this.load.image('pull-book', `hd/pull-book.png${v}`);
+    this.load.image('rug', `hd/rug.png${v}`);
+    this.load.image('hatch-lid', `hd/hatch-lid.png${v}`);
   }
 
   create(): void {
+    // Everything loaded so far is pixel art (apart from high-res sheets in sprites/hd/):
+    // keep its pixels crisp on the zoomed-in cameras. Textures made below stay smooth.
+    for (const key of this.textures.getTextureKeys()) {
+      const tex = this.textures.get(key);
+      const src = tex.source[0]?.source as HTMLImageElement | undefined;
+      if (src && 'src' in src && !src.src.includes('/hd/')) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
     this.glow('glow-warm', 48, [255, 190, 110]);
     this.glow('glow-moon', 64, [140, 160, 255]);
     this.vignette();
@@ -62,28 +77,14 @@ export class BootScene extends Phaser.Scene {
       const have = list.filter((f) => tex.has(f as unknown as string));
       return this.anims.generateFrameNumbers(key, { frames: have.length > 0 ? have : [0] });
     };
-    this.anims.create({ key: 'player-idle', frames: frames('player', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
-    this.anims.create({ key: 'player-climb', frames: frames('player', [8, 9]), frameRate: 6, repeat: -1 });
-    this.anims.create({ key: 'player-run', frames: frames('player', [2, 3, 4, 5]), frameRate: 10, repeat: -1 });
-    // The same idle and run holding each weapon: the pistol's poses start at frame 10, the shotgun's at 18.
-    for (const [weapon, first] of Object.entries(PLAYER_HOLDING)) {
-      const idle = [first, first, first, first + 1];
-      const run = [first + 2, first + 3, first + 4, first + 5];
-      this.anims.create({ key: `player-idle-${weapon}`, frames: frames('player', idle), frameRate: 3, repeat: -1 });
-      this.anims.create({ key: `player-run-${weapon}`, frames: frames('player', run), frameRate: 10, repeat: -1 });
-    }
-    this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
-    this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
-    // Head blown off by a bullet: hit, burst, stand pumping goo, sway, knees go, flat on its back.
-    // A machete cut skips the hit and burst: the head flies off whole.
-    this.anims.create({ key: 'zombie-headshot', frames: frames('zombie', [6, 7, 7, 8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
-    this.anims.create({ key: 'zombie-headless', frames: frames('zombie', [8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
-    this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
-    this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
-    this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
-    // A ghost burning up: roaring flames three times over, then dying down.
-    const roar = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6];
-    this.anims.create({ key: 'fire-burn', frames: frames('fire', roar), frameRate: 12 });
+    createPlayerAnims(this, PLAYER_HOLDING);
+    // Enemies' video clips: zombie-walk, -climb, -attack, -hurt and -death (headless
+    // already); ghost-float, -attack, -hurt and -death (burning up).
+    createClipAnims(this, 'zombie', 'zombie', ENEMY_CLIPS.zombie);
+    createClipAnims(this, 'ghost', 'ghost', ENEMY_CLIPS.ghost);
+    // The vampire: idle, walk, hiss, crouch then tremble (the warning), launch, fly and land
+    // (the lunge), and death (headless already, crumbling to ash).
+    createClipAnims(this, 'vampire', 'vampire', ENEMY_CLIPS.vampire);
     this.anims.create({ key: 'gem-sparkle', frames: frames('gem', [0, 1, 2, 3]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'candle-flicker', frames: frames('candle', [0, 1, 0, 2, 1, 2]), frameRate: 8, repeat: -1 });
 

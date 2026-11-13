@@ -7,8 +7,8 @@ type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
 type Mode = 'guard' | 'alert' | 'stalk' | 'windup' | 'lunge' | 'recover' | 'stunned' | 'return';
 
-/** Frames in the 'vampire' sheet (see tools/sprites.py). */
-export const VAMPIRE_FRAME = { stand: 0, crouch: 6, lunge: 7, hiss: 8, headless: 9 } as const;
+/** Poses that hold still while it stands: breathing, or hissing (its clip ends and holds). */
+type Stance = 'idle' | 'hiss';
 
 /**
  * Drives the vampire that guards the exit. It stands at its post, looking about,
@@ -52,7 +52,7 @@ export class VampireBrain {
 
     switch (this.mode) {
       case 'guard':
-        this.stand(VAMPIRE_FRAME.stand, true);
+        this.stand('idle');
         if (sees) this.spot(time);
         else if (time >= this.nextLookAt) {
           // Glances the other way now and then, then back towards the way in.
@@ -68,7 +68,7 @@ export class VampireBrain {
         } else this.walk(Math.sign(this.postX - this.v.x), VAMPIRE.speed);
         break;
       case 'alert':
-        this.stand(VAMPIRE_FRAME.hiss);
+        this.stand('hiss');
         this.facePlayer();
         if (!fair) this.mode = 'return';
         else if (time >= this.until) this.mode = 'stalk';
@@ -89,23 +89,23 @@ export class VampireBrain {
         if (gone || !this.canStep(this.dir) || this.blocked(this.dir) || !this.inTerritory(this.v.x + this.dir * 4, 2 * TILE)) {
           this.mode = 'recover';
           this.until = time + VAMPIRE.lungeRecover;
-          this.stand(VAMPIRE_FRAME.stand, true);
+          this.v.setVelocityX(0);
+          this.pose('vampire-land', 'vampire-idle');
         } else {
-          this.v.anims.stop();
-          this.v.setFrame(VAMPIRE_FRAME.lunge).setVelocityX(this.dir * VAMPIRE.lungeSpeed);
+          this.pose('vampire-launch', 'vampire-fly');
+          this.v.setVelocityX(this.dir * VAMPIRE.lungeSpeed);
         }
         break;
       }
       case 'recover':
-        this.stand(VAMPIRE_FRAME.stand, true);
+        this.stand('idle');
         if (time >= this.until) this.mode = 'stalk';
         break;
       case 'stunned': {
         // Reeling back from a cut: slides to a stop, but not off its floor.
         const vx = this.body.velocity.x * 0.88;
         this.v.setVelocityX(this.canStep(Math.sign(vx)) ? vx : 0);
-        this.v.anims.stop();
-        this.v.setFrame(VAMPIRE_FRAME.hiss);
+        this.pose('vampire-hiss');
         if (time >= this.until) this.mode = 'stalk';
         break;
       }
@@ -119,10 +119,10 @@ export class VampireBrain {
    */
   private warn(time: number): void {
     this.v.setVelocityX(0);
-    this.v.anims.stop();
     const t = time - this.windupFrom;
     const rearing = t < VAMPIRE.lungeWindup * VAMPIRE.warnRearShare;
-    this.v.setFrame(rearing ? VAMPIRE_FRAME.hiss : VAMPIRE_FRAME.crouch);
+    if (rearing) this.pose('vampire-hiss');
+    else this.pose('vampire-crouch', 'vampire-tremble');
     // Red flashes that speed up towards the lunge.
     const left = this.until - time;
     const period = left > VAMPIRE.lungeWindup / 2 ? 160 : 80;
@@ -197,34 +197,43 @@ export class VampireBrain {
       this.mode = 'windup';
       this.windupFrom = time;
       this.until = time + VAMPIRE.lungeWindup;
-      this.stand(VAMPIRE_FRAME.hiss);
+      this.stand('hiss');
       emote(this.v, this.body.top, EMOTE.spotted);
       return;
     }
     // Follows the player's x, but only as far as its own patch.
     const target = Phaser.Math.Clamp(p.center.x, this.postX - VAMPIRE.leash, this.postX + VAMPIRE.leash);
     const dir = Math.sign(target - this.v.x);
-    if (Math.abs(target - this.v.x) < 3 || !this.canStep(dir) || this.blocked(dir)) this.stand(VAMPIRE_FRAME.hiss);
+    if (Math.abs(target - this.v.x) < 3 || !this.canStep(dir) || this.blocked(dir)) this.stand('hiss');
     else this.walk(dir, VAMPIRE.stalkSpeed);
   }
 
   private walk(dir: number, speed: number): void {
     if (!this.canStep(dir) || this.blocked(dir)) {
-      this.stand(VAMPIRE_FRAME.stand, true);
+      this.stand('idle');
       return;
     }
     this.face(dir);
     this.v.setVelocityX(dir * speed);
-    this.v.anims.play('vampire-walk', true);
+    this.pose('vampire-walk');
   }
 
-  private stand(frame: number, idle = false): void {
+  private stand(stance: Stance): void {
     this.v.setVelocityX(0);
-    if (idle) this.v.anims.play('vampire-idle', true);
-    else {
-      this.v.anims.stop();
-      this.v.setFrame(frame);
-    }
+    // Landing from a lunge runs into the idle by itself.
+    this.pose(`vampire-${stance}`, undefined, ['vampire-land']);
+  }
+
+  /**
+   * Plays a clip (then `next`, if given), unless it is already on: playing, or held at its
+   * end, or `next` is. Clips in `also` are let finish first.
+   */
+  private pose(key: string, next?: string, also: string[] = []): void {
+    const now = this.v.anims.currentAnim?.key;
+    if (now === key || (next && now === next) || (now && also.includes(now) && this.v.anims.isPlaying)) return;
+    this.v.anims.chain();
+    this.v.anims.play(key);
+    if (next) this.v.anims.chain(next);
   }
 
   private face(dir: number): void {

@@ -1,7 +1,33 @@
-/** Shared game constants. Low resolution, scaled up with crisp pixels for a retro look. */
+/**
+ * Shared game constants. The game world is measured in "world units": a tile is TILE units,
+ * and the camera shows GAME_WIDTH x GAME_HEIGHT units. The canvas is RENDER_SCALE times
+ * bigger and every camera is zoomed by RENDER_SCALE, so high-res art (drawn at RENDER_SCALE
+ * pixels per unit) shows at full detail while speeds, sizes and levels keep their units.
+ */
 export const TILE = 16;
-export const GAME_WIDTH = 320;
-export const GAME_HEIGHT = 200;
+export const GAME_WIDTH = 256;
+export const GAME_HEIGHT = 160;
+/**
+ * High-res pixels per world unit, and the game camera's zoom. 5 makes the 1280x800 canvas show
+ * 256x160 units: a room (9 tiles, 144 units) still fits top to bottom, with characters as big
+ * as they can be. High-res art (tools/art) is rendered at this density.
+ */
+export const RENDER_SCALE = 5;
+/** The HUD keeps its own 320x200 layout, zoomed to fill the same canvas. */
+export const HUD_WIDTH = 320;
+export const HUD_HEIGHT = 200;
+export const HUD_SCALE = (GAME_WIDTH * RENDER_SCALE) / HUD_WIDTH;
+/** Text style settings that keep small text sharp on the zoomed-in cameras. */
+export const TEXT_RES = { resolution: RENDER_SCALE } as const;
+
+/**
+ * Where an object that ignores the camera's scroll (scroll factor 0) must sit for its top-left
+ * corner to land on the screen's top-left corner, given the main camera zooms around its middle.
+ */
+export const SCREEN_ORIGIN = {
+  x: (GAME_WIDTH * (RENDER_SCALE - 1)) / 2,
+  y: (GAME_HEIGHT * (RENDER_SCALE - 1)) / 2,
+} as const;
 
 export const PLAYER = {
   runSpeed: 110,
@@ -21,6 +47,11 @@ export const CAMERA = {
   lerp: 0.12,
   /** The camera never moves slower than this (px/s) until it arrives, so scrolls end cleanly. */
   minSpeed: 60,
+  /**
+   * How far above the player the camera centres (world units), so the floor they stand on
+   * sits near the bottom of the screen and the room above them, up to its ceiling, is in view.
+   */
+  lookUp: 48,
 };
 
 // ============================================================================
@@ -344,12 +375,20 @@ export interface SkinStats {
   name: string;
   /** The sheet in public/sprites. */
   sheet: string;
+  /**
+   * A high-res sheet built by tools/art (npm run art): a grid of PLAYER_FRAME-sized frames,
+   * RENDER_SCALE pixels per world unit, with the extra in-between frames of PLAYER_HD_FRAMES.
+   * Without it the sheet is the old 20x24 pixel-art strip, scaled up with crisp pixels.
+   */
+  hd?: boolean;
+  /** The part of frame 0 shown as the face in the HUD, in world units (a frame is 20x24): x, y, width, height. */
+  face?: readonly [number, number, number, number];
 }
 
 export const SKINS = {
-  hunter: { name: 'GHOST HUNTER', sheet: 'player.png' },
-  weaver: { name: 'THE WEAVER', sheet: 'player-weaver.png' },
-  ink: { name: 'INK', sheet: 'player-ink.png' },
+  hunter: { name: 'GHOST HUNTER', sheet: 'hd/player-hunter.png', hd: true, face: [3.5, 0.5, 13, 11] },
+  weaver: { name: 'THE WEAVER', sheet: 'hd/player-weaver.png', hd: true, face: [3.5, 0.5, 13, 11] },
+  ink: { name: 'INK', sheet: 'hd/player-ink.png', hd: true, face: [3.5, 0.5, 13, 11] },
 } satisfies Record<string, SkinStats>;
 
 export type SkinId = keyof typeof SKINS;

@@ -1,0 +1,49 @@
+{
+  "players": {
+    "hunter": { "start": 70, "standHeight": 89, "clips": [
+      {"name": "idle", "file": "idle", "strip": 26, "fps": 6, "anchor": "strip"},
+      {"name": "run", "file": "run", "strip": 12, "fps": 24, "anchor": "strip"},
+      {"name": "jump", "file": "jump_rise", "strip": 11, "frames": [3, 4, 5, 6, 7, 8, 9, 10], "fps": 18, "anchor": "feet", "once": true, "scale": 1.15},
+      {"name": "fall", "file": "jump_fall", "strip": 7, "frames": [0, 1, 2, 3, 4], "fps": 12, "anchor": "feet", "once": true, "scale": 1.15},
+      {"name": "land", "file": "jump_land", "strip": 5, "fps": 16, "anchor": "strip", "once": true, "scale": 1.15},
+      {"name": "climb", "file": "climb", "strip": 16, "fps": 10, "anchor": "strip"},
+      {"name": "run-pistol", "file": "run_pistol", "strip": 11, "fps": 22, "anchor": "strip"},
+      {"name": "run-shotgun", "file": "run_shotgun", "strip": 8, "fps": 16, "anchor": "strip"},
+      {"name": "swing", "file": "machete_swing", "strip": 14, "fps": 16, "anchor": "strip", "once": true, "hitFrame": 7},
+      {"name": "idle-pistol", "file": "idle_pistol", "strip": 8, "fps": 6, "anchor": "strip"},
+      {"name": "fire-pistol", "file": "fire_pistol", "strip": 10, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "idle-shotgun", "file": "idle_shotgun", "strip": 10, "fps": 6, "anchor": "strip"},
+      {"name": "fire-shotgun", "file": "fire_shotgun", "strip": 13, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "hurt", "file": "hurt", "strip": 9, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "death", "file": "death", "strip": 11, "fps": 12, "anchor": "strip", "once": true, "centre": "all"},
+      {"name": "idle-machete", "file": "idle_machete", "strip": 21, "fps": 12, "anchor": "strip"},
+      {"name": "run-machete", "file": "run_machete", "strip": 14, "fps": 26, "anchor": "strip"}
+    ] }
+  },
+  "enemies": {
+    "zombie": { "start": 12, "standHeight": 90, "clips": [
+      {"name": "walk", "file": "walk", "strip": 13, "fps": 12, "anchor": "strip"},
+      {"name": "attack", "file": "attack", "strip": 15, "fps": 14, "anchor": "strip", "once": true},
+      {"name": "hurt", "file": "hurt", "strip": 10, "fps": 14, "anchor": "strip", "once": true},
+      {"name": "death", "file": "death", "strip": 21, "fps": 12, "anchor": "strip", "once": true, "centre": "all"},
+      {"name": "climb", "file": "climb", "strip": 20, "fps": 12, "anchor": "strip", "scale": 0.8}
+    ] },
+    "ghost": { "start": 4, "standHeight": 80, "clips": [
+      {"name": "float", "file": "float", "strip": 21, "fps": 12, "anchor": "video", "origin": [182, 64]},
+      {"name": "attack", "file": "attack", "strip": 21, "fps": 14, "anchor": "video", "origin": [10, 40], "once": true},
+      {"name": "hurt", "file": "hurt", "strip": 20, "fps": 16, "anchor": "video", "origin": [28, 50], "once": true},
+      {"name": "death", "file": "death", "strip": 21, "fps": 14, "anchor": "video", "origin": [134, 0], "once": true}
+    ] },
+    "vampire": { "start": 10, "standHeight": 88, "ground": true, "clips": [
+      {"name": "idle", "file": "idle", "strip": 21, "fps": 12, "anchor": "video", "origin": [226, 76]},
+      {"name": "walk", "file": "walk", "strip": 16, "fps": 12, "anchor": "video", "origin": [194, 76]},
+      {"name": "hiss", "file": "hiss", "strip": 18, "fps": 14, "anchor": "video", "origin": [103, 56], "once": true},
+      {"name": "crouch", "file": "crouch", "strip": 21, "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 16, "anchor": "video", "origin": [164, 210], "once": true},
+      {"name": "tremble", "file": "crouch", "strip": 21, "frames": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "fps": 14, "anchor": "video", "origin": [164, 210]},
+      {"name": "launch", "file": "lunge", "strip": 19, "frames": [2, 3, 4], "fps": 16, "anchor": "video", "origin": [58, 80], "once": true},
+      {"name": "fly", "file": "lunge", "strip": 19, "frames": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "fps": 14, "anchor": "video", "origin": [58, 80]},
+      {"name": "land", "file": "lunge", "strip": 19, "frames": [15, 16, 17, 18], "fps": 14, "anchor": "video", "origin": [58, 80], "once": true},
+      {"name": "death", "file": "death", "strip": 21, "fps": 12, "anchor": "video", "origin": [130, 158], "once": true}
+    ] }
+  }
+}
