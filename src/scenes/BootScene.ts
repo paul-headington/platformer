@@ -48,9 +48,9 @@ export class BootScene extends Phaser.Scene {
     // Painted house props, high-res: drawn at 1 / RENDER_SCALE.
     this.load.spritesheet('candle', `hd/candle.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * RENDER_SCALE });
     this.load.spritesheet('door', `hd/door.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
-    this.load.spritesheet('lurker', `lurker.png${v}`, { frameWidth: TILE * 2, frameHeight: TILE * 2 });
-    this.load.spritesheet('tentacle', `tentacle.png${v}`, { frameWidth: TILE * 1.5, frameHeight: TILE * 2 });
-    this.load.spritesheet('snake', `snake.png${v}`, { frameWidth: TILE, frameHeight: 20 });
+    this.load.spritesheet('lurker', `hd/lurker.png${v}`, { frameWidth: TILE * 2 * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
+    this.load.spritesheet('tentacle', `hd/tentacle.png${v}`, { frameWidth: TILE * 1.5 * RENDER_SCALE, frameHeight: TILE * 2 * RENDER_SCALE });
+    this.load.spritesheet('snake', `hd/snake.png${v}`, { frameWidth: TILE * RENDER_SCALE, frameHeight: 20 * RENDER_SCALE });
     this.load.image('sky', `hd/sky.png${v}`);
     this.load.image('pull-book', `hd/pull-book.png${v}`);
     this.load.image('rug', `hd/rug.png${v}`);

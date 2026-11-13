@@ -130,7 +130,7 @@ function buildProp(name, file, width, scale) {
  */
 const PROPS = {
   pickups: { gem: 'gem', key: 'key', gun: 'pistol', shotgun: 'shotgun', machete: 'machete', jacket: 'jacket', bullet: 'bullet', salt: 'salt' },
-  house: { candle: 'candle', door: 'door', sky: 'sky', 'pull-book': 'pull_book', rug: 'rug', 'hatch-lid': 'hatch_lid' },
+  house: { candle: 'candle', door: 'door', sky: 'sky', 'pull-book': 'pull_book', rug: 'rug', 'hatch-lid': 'hatch_lid', lurker: 'lurker', snake: 'snake', tentacle: 'tentacle' },
 };
 function buildProps(folder) {
   const files = PROPS[folder];

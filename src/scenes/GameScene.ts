@@ -480,7 +480,7 @@ export class GameScene extends Phaser.Scene {
         this.traps.push(current);
       }
       current.tiles.push(tile);
-      const snake = this.add.sprite(tile.getCenterX(), tile.pixelY + 3, 'snake', 0).setOrigin(0.5, 1).setDepth(11);
+      const snake = this.add.sprite(tile.getCenterX(), tile.pixelY + 3, 'snake', 0).setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setDepth(11);
       current.snakes.push(snake.setFlipX(tile.x % 2 === 1).setVisible(false));
     });
   }
@@ -644,7 +644,7 @@ export class GameScene extends Phaser.Scene {
    * it really looks like it comes out of the duct. It hides if the player is close.
    */
   private addTentacle(left: number, top: number): void {
-    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setOrigin(0, 0).setDepth(-2.5);
+    const tentacle = this.add.sprite(left - 4, top, 'tentacle', 0).setScale(1 / RENDER_SCALE).setOrigin(0, 0).setDepth(-2.5);
     const tooClose = () => Math.abs(this.player.x - left - 8) < TILE * 2 && Math.abs(this.player.y - top - 16) < TILE * 3;
     const out = [1, 2, 3, 4, 3, 5, 4, 3, 5, 4, 3];
     // Where the tip of the tentacle is in each frame, relative to the vent's top-left.
@@ -693,7 +693,7 @@ export class GameScene extends Phaser.Scene {
    */
   private addLurker(left: number, bottom: number): void {
     const FRAME = { dark: 0, eyes: 1, blink: 2, left: 3, right: 4, fingers: 5 };
-    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setOrigin(0, 1).setDepth(1);
+    const lurker = this.add.sprite(left, bottom, 'lurker', FRAME.dark).setScale(1 / RENDER_SCALE).setOrigin(0, 1).setDepth(1);
     const cx = left + 20;
     const tooClose = () => Math.abs(this.player.x - cx) < TILE * 3 && Math.abs(this.player.y - bottom) < TILE * 3;
     const look = () => (this.player.x < cx - TILE ? FRAME.left : this.player.x > cx + TILE ? FRAME.right : FRAME.eyes);
