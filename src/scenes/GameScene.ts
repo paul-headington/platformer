@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { goToMenu } from './MenuScene';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
 import { VampireBrain } from '../ai/VampireBrain';
@@ -802,6 +803,8 @@ export class GameScene extends Phaser.Scene {
     this.keySwitch = [kb.addKey(K.C), kb.addKey(K.Q)];
     this.keyUse = [kb.addKey(K.E)];
     this.keyRestart = kb.addKey(K.ENTER);
+    // Esc goes back to the title screen.
+    kb.once('keydown-ESC', () => goToMenu(this));
   }
 
   private static anyDown(keys: Phaser.Input.Keyboard.Key[]): boolean {
@@ -1408,7 +1411,7 @@ export class GameScene extends Phaser.Scene {
     pad.clearPresses();
     // He lies where he fell when the skin has a death clip; otherwise he has dropped off screen.
     if (!playerClip(this, 'death')) this.player.setVisible(false);
-    this.say(`GAME OVER\n${this.isTouch() ? 'Tap' : 'Press Enter'} to try again`, true);
+    this.say(`GAME OVER\n${this.isTouch() ? 'Tap' : 'Press Enter'} to try again${this.isTouch() ? '' : '\nEsc for the menu'}`, true);
   }
 
   private reachDoor(): void {
@@ -1427,7 +1430,7 @@ export class GameScene extends Phaser.Scene {
     pad.clearPresses();
     this.addScore(SCORE.exit);
     this.player.setVelocity(0, 0).setVisible(false);
-    this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\n${this.isTouch() ? 'Tap' : 'Press Enter'} to play again`, true);
+    this.say(`LEVEL COMPLETE!\nScore ${this.registry.get(REG.score)}\n${this.isTouch() ? 'Tap' : 'Press Enter'} to play again${this.isTouch() ? '' : '\nEsc for the menu'}`, true);
   }
 
   /** Gives a new enemy sprite its type's stats and full health. */

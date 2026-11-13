@@ -3,6 +3,7 @@ import { HUD_HEIGHT, HUD_SCALE, HUD_WIDTH, REG, RENDER_SCALE, TEXT_RES, SKINS, W
 import { currentSkin, faceCrop, nextSkin } from '../skins';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
+import { goToMenu } from './MenuScene';
 
 /** Score, lives and item bar along the top, plus centred messages. Reads everything from the registry. */
 export class HudScene extends Phaser.Scene {
@@ -37,6 +38,12 @@ export class HudScene extends Phaser.Scene {
     this.showFace();
     this.add.zone(100, 0, 64, 14).setOrigin(0, 0).setInteractive().on('pointerdown', () => this.changeSkin());
     this.input.keyboard?.on('keydown-K', () => this.changeSkin());
+    // MENU, between the score and the face: back to the title screen (Esc does the same).
+    this.add
+      .text(76, 3, 'MENU', { ...style, fontSize: '6px' })
+      .setAlpha(0.6)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => goToMenu(this));
     // One icon per weapon, right to left before the key. Tapping or clicking them switches weapons.
     this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
     let right = HUD_WIDTH - 28;
