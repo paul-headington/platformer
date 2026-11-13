@@ -3,10 +3,15 @@
 // Each sheet keeps the frame order of the pixel-art sheet it replaces (see TILE_SHEETS in
 // tools/sprites.py); frames not redrawn yet fall back to the old pixel art, scaled up.
 //
-// Done so far (the entrance hall): stone wall, shelf, stairs, floorboards, trapdoor in the
-// floorboards; the downstairs wallpaper, dado rail and panelling; portraits, bookcase, cobwebs.
+// The tiles and back walls are now painted (Scenario art in art/house/); the vector tiles
+// below are kept for reference. The decor (portraits, bookcase, cobwebs) is still vector.
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { clipped, ellipse, g, path, stroke, t, vgrad } from './svg.mjs';
+
+const PAINTED_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'art', 'house');
 
 export const CELL = 64;
 
@@ -209,10 +214,37 @@ function cobweb(right) {
   return right ? g('translate(64 0) scale(-1 1)', s) : s;
 }
 
-/** Frames to draw in high res, per sheet; any other frame falls back to the pixel art. */
+/**
+ * A painted tile from art/house/ (Scenario art at 10 px per unit), filling the cell;
+ * `mirror` flips it left to right.
+ */
+function painted(file, mirror = false) {
+  const href = `data:image/png;base64,${readFileSync(join(PAINTED_DIR, `${file}.png`)).toString('base64')}`;
+  const image = `<image href="${href}" width="${CELL}" height="${CELL}" preserveAspectRatio="none" image-rendering="optimizeQuality"/>`;
+  return () => (mirror ? g(`translate(${CELL} 0) scale(-1 1)`, image) : image);
+}
+
+/**
+ * Frames to draw in high res, per sheet; any other frame falls back to the pixel art.
+ * Tiles and back walls are painted (art/house/); the decor is still the vector set above.
+ */
 export const SHEETS = {
-  tiles: { pixel: 'tiles.png', frames: { 0: wall, 1: shelf, 4: () => stairs(false), 5: () => stairs(true), 6: () => floorboards(), 10: () => floorboards(true) } },
-  back: { pixel: 'back.png', frames: { 4: wallpaper, 5: dadoRail, 6: panelling } },
+  tiles: {
+    pixel: 'tiles.png',
+    frames: Object.fromEntries(
+      ['tile_stone', 'tile_shelf', 'tile_ladder', 'tile_ladder_top', 'tile_stairs', ['tile_stairs', true], 'tile_floorboards', 'tile_roof',
+        'tile_flagstone', 'tile_crate', 'tile_trap_boards', 'tile_trap_boards_open', 'tile_trap_flag', 'tile_trap_flag_open']
+        .map((f, i) => [i, Array.isArray(f) ? painted(...f) : painted(f)]),
+    ),
+  },
+  back: {
+    pixel: 'back.png',
+    frames: Object.fromEntries(
+      ['back_attic_planks', 'back_mauve_paper', 'back_mauve_rail', 'back_mauve_panel', 'back_teal_paper', 'back_teal_rail', 'back_teal_panel',
+        'back_cellar_stone', 'back_floor_gap', 'back_sage_paper', 'back_sage_rail', 'back_sage_panel']
+        .map((f, i) => [i, painted(f)]),
+    ),
+  },
   decor: { pixel: 'decor.png', frames: { 4: () => cobweb(false), 5: () => cobweb(true), 6: () => portrait(0), 7: () => portrait(1), 8: () => bookcase(false), 9: () => bookcase(true) } },
 };
 
