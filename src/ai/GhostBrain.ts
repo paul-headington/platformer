@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GHOST, TILE } from '../config';
 import { EMOTE, emote } from './emote';
+import { flinchPace } from './flinch';
 import type { Cell, NavGrid } from './NavGrid';
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
@@ -52,13 +53,15 @@ export class GhostBrain {
 
   update(time: number, delta: number): void {
     const dt = Math.min(delta, 50) / 1000;
+    // Reeling from a hit, it barely moves until its hurt clip is nearly done.
+    const move = dt * flinchPace(this.g, 'ghost-hurt', GHOST);
     const seen = this.sees();
     if (seen) this.lastSeenAt = time;
 
     switch (this.mode) {
       case 'haunt':
         if (seen) this.spot(time);
-        else this.drift(dt);
+        else this.drift(move);
         break;
       case 'alert':
         if (!this.world.playerIsFair()) this.forget();
@@ -70,11 +73,11 @@ export class GhostBrain {
       case 'chase':
         if (!this.world.playerIsFair()) this.forget();
         else if (time - this.lastSeenAt > GHOST.forgetAfter || this.farFromHome()) this.giveUp();
-        else this.chase(time, dt);
+        else this.chase(time, move);
         break;
       case 'return':
         if (seen) this.spot(time);
-        else this.goHome(time, dt);
+        else this.goHome(time, move);
         break;
     }
 

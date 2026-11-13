@@ -207,6 +207,13 @@ export const ZOMBIE = {
   /** Bullets and the machete. The shotgun is loaded with rock salt, which just bounces off. */
   hurtBy: ['pistol', 'machete'],
   death: 'headshot',
+  /**
+   * Hit but not killed, it staggers while its hurt clip plays (about 0.7 s): it moves at
+   * flinchSpeed (a share of its speed, 0 = stops dead) until flinchHold of the way through
+   * the clip (0 to 1), then eases back up to full speed as the clip ends.
+   */
+  flinchSpeed: 0.1,
+  flinchHold: 0.6,
 
   // ---- Movement -------------------------------------------------------------
   /** Wandering speed. */
@@ -248,6 +255,13 @@ export const GHOST = {
   hurtBy: ['shotgun'],
   /** Burns up in a burst of flame. */
   death: 'burn',
+  /**
+   * Hit but not killed, it reels while its hurt clip plays (about 1.25 s): it moves at
+   * flinchSpeed (a share of its speed, 0 = stops dead) until flinchHold of the way through
+   * the clip (0 to 1), then eases back up to full speed as the clip ends. The bob carries on.
+   */
+  flinchSpeed: 0.15,
+  flinchHold: 0.65,
 
   // ---- Movement -------------------------------------------------------------
   /** Drifting back and forth over its haunt: speed, and how far each way from home (px). */
@@ -331,8 +345,13 @@ export const VAMPIRE = {
   lungeDistance: 5 * TILE,
   /** Stands still after a lunge, open to a cut (ms). */
   lungeRecover: 650,
-  /** After a cut that doesn't kill it, it reels back and can't attack for this long (ms). */
+  /**
+   * After a cut that doesn't kill it, it reels back hissing and can't attack for this long (ms).
+   * It has no hurt clip of its own; the reel is its flinch.
+   */
   stunTime: 650,
+  /** How hard a cut knocks it back (px/s). It slides to a stop over the reel. */
+  stunKnockback: 170,
 } satisfies EnemyStats & Record<string, number | string | readonly string[]>;
 
 /** Every enemy type by name. A new enemy type gets its own block above and an entry here. */
