@@ -26,7 +26,8 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
-import { playerAnim, playerClip, type PlayerClip } from '../skins';
+import { playerAnim, playerClip } from '../skins';
+import type { Clip } from '../clips';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
 // Tile indexes in the 'tiles' sheet (see TILE_SHEETS in tools/sprites.py).
@@ -80,9 +81,8 @@ export const PLAYER_HOLDING: Record<WeaponId, number> = { pistol: 10, shotgun: 1
 /** A machete swing: the blade goes up, then comes down (frames in the player sheet). */
 const MACHETE_SWING = { raise: 34, strike: 35 } as const;
 /** Zombie sheet frames (see tools/sprites.py). */
-const ZOMBIE_FRAME = { hit: 6, burst: 7, headless: 8 } as const;
 /** A pistol headshot: when the head bursts after the hit (ms), and how many bits fly off. */
-const ZOMBIE_HEADSHOT = { burstAt: 90, bits: 10 } as const;
+const ZOMBIE_HEADSHOT = { burstAt: 0, bits: 10 } as const;
 /** How long a headless zombie lies on the floor before fading, and how long the fade takes (ms). */
 const ZOMBIE_CORPSE = { lie: 1400, fade: 500 } as const;
 /** Gore sheet frames. */
@@ -99,7 +99,7 @@ function playOnce(sprite: Phaser.GameObjects.Sprite, key: string): void {
  * The frame of a video swing clip `elapsed` ms into a swing: the wind-up runs until the
  * blade's hitAt, when the clip reaches its hitFrame, and the follow-through fills the rest.
  */
-function swingFrame(clip: PlayerClip, elapsed: number, blade: BladeStats): number {
+function swingFrame(clip: Clip, elapsed: number, blade: BladeStats): number {
   const n = clip.frames.length;
   const hit = clip.hitFrame ?? Math.floor(n / 2);
   const i =
@@ -338,8 +338,9 @@ export class GameScene extends Phaser.Scene {
             this.addLooseBook(tx, ty);
             break;
           case 'z': {
-            const z = this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite;
-            (z.body as Body).setSize(8, 21).setOffset(6, 3);
+            // High-res like the player: drawn at 1 / RENDER_SCALE, its body sized in texture pixels.
+            const z = (this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (z.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
             this.setEnemy(z, 'zombie').play('zombie-walk');
             break;
           }
@@ -407,7 +408,14 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(
       this.player,
       [this.zombies, this.ghosts, this.vampires],
-      (_p, e) => this.hurt(false, ((e as Sprite).getData('stats') as EnemyStats).damage),
+      (_p, e) => {
+        const enemy = e as Sprite;
+        this.hurt(false, (enemy.getData('stats') as EnemyStats).damage);
+        // A zombie that catches the player swipes at them.
+        if (this.state === 'dying' && enemy.getData('type') === 'zombie' && enemy.anims.currentAnim?.key !== 'zombie-attack') {
+          enemy.play('zombie-attack');
+        }
+      },
       (_p, e) => this.touchesHurtbox(e as Sprite),
     );
     this.physics.add.overlap(this.player, gems, (_p, g) => {
@@ -1438,6 +1446,7 @@ export class GameScene extends Phaser.Scene {
       const brain = enemy.getData('brain') as ZombieBrain | GhostBrain | VampireBrain;
       if (brain instanceof VampireBrain) brain.shot(this.time.now, from || undefined);
       else brain.shot(this.time.now);
+      if (brain instanceof ZombieBrain) enemy.play('zombie-hurt');
       return;
     }
     this.killEnemy(enemy, from, weapon);
@@ -1522,15 +1531,16 @@ export class GameScene extends Phaser.Scene {
     const neckY = feet - 15;
     enemy.destroy();
 
-    const body = this.add.sprite(x, feet, 'zombie', ZOMBIE_FRAME.hit).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
-    body.play(cut ? 'zombie-headless' : 'zombie-headshot');
+    // The death clip starts headless: smoke at the neck, a stumble, then flat on its face.
+    const body = this.add.sprite(x, feet, 'zombie').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
+    body.play('zombie-death');
     body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       this.tweens.add({ targets: body, alpha: 0, delay: ZOMBIE_CORPSE.lie, duration: ZOMBIE_CORPSE.fade, onComplete: () => body.destroy() });
     });
 
     if (cut) {
       // The head flies off whole, spinning, and rolls to a stop.
-      const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setFlipX(flip).setDepth(6);
+      const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
       const landX = x + away * 28;
       this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 600, ease: 'Linear' });
       this.tweens.chain({
@@ -1549,7 +1559,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // The head bursts a moment after the bullet lands (frame 6 is the hit, frame 7 the burst).
+    // The head bursts as the bullet lands (the death clip starts headless).
     this.time.delayedCall(ZOMBIE_HEADSHOT.burstAt, () => {
       this.cameras.main.shake(90, 0.004);
       this.splatter(x, neckY - 4, feet, away, ZOMBIE_HEADSHOT.bits,

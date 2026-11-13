@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TILE } from '../config';
 import { PLAYER_HOLDING } from './GameScene';
 import { createPlayerAnims, createPlayerTexture, loadSkins } from '../skins';
+import { ENEMY_CLIPS, createClipAnims } from '../clips';
 
 /**
  * Loads the sprite sheets from public/sprites (all built by tools/sprites.py)
@@ -19,10 +20,11 @@ export class BootScene extends Phaser.Scene {
     const v = `?v=${__BUILD_ID__}`;
     // Every player skin; the 'player' texture is made from the chosen one in create().
     loadSkins(this.load, v);
-    this.load.spritesheet('zombie', `zombie.png${v}`, { frameWidth: 20, frameHeight: 24 });
+    // High-res, like the player: cells of 20x24 units at RENDER_SCALE (see tools/art).
+    this.load.spritesheet('zombie', `hd/zombie.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
     this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.image('vampire-head', `vampire-head.png${v}`);
-    this.load.image('zombie-head', `zombie-head.png${v}`);
+    this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
     this.load.image('machete', `machete.png${v}`);
     this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
@@ -75,12 +77,10 @@ export class BootScene extends Phaser.Scene {
       return this.anims.generateFrameNumbers(key, { frames: have.length > 0 ? have : [0] });
     };
     createPlayerAnims(this, PLAYER_HOLDING);
-    this.anims.create({ key: 'zombie-walk', frames: frames('zombie', [0, 1, 2, 3]), frameRate: 5, repeat: -1 });
+    // The zombie's video clips: walk, attack, hurt and death (headless already). It climbs
+    // in its old pixel-art frames, scaled up, until it has a climbing clip.
+    createClipAnims(this, 'zombie', 'zombie', ENEMY_CLIPS.zombie);
     this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
-    // Head blown off by a bullet: hit, burst, stand pumping goo, sway, knees go, flat on its back.
-    // A machete cut skips the hit and burst: the head flies off whole.
-    this.anims.create({ key: 'zombie-headshot', frames: frames('zombie', [6, 7, 7, 8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
-    this.anims.create({ key: 'zombie-headless', frames: frames('zombie', [8, 8, 8, 9, 9, 10, 11]), frameRate: 11 });
     this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
     this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
     this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });

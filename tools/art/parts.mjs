@@ -62,33 +62,40 @@ export function placeImage(p, width, fx, fy, extra = '') {
 }
 
 /**
- * Measures a strip of `count` equal frames: { fw, fh } (one frame, in pixels), the box
- * around each frame's drawing and around all of them together ({ x0, y0, x1, y1 } in
- * pixels of one frame), and `legsX`: the middle, across all frames, of what is drawn in
- * the lowest `band` of the union box (the legs, a steadier centre than arms or blades).
+ * Measures a clip: `count` equal frames in a grid, up to 8 a row. Returns { fw, fh } (one
+ * frame, in pixels), `columns` and `rows`, the box around each frame's drawing and around
+ * all of them together ({ x0, y0, x1, y1 } in pixels of one frame), and `legsX`: the middle,
+ * across all frames, of what is drawn in the lowest `band` of the union box (the legs, a
+ * steadier centre than arms or blades).
  */
 export function stripFrames(dir, name, count, band = 0.3) {
   const png = readFileSync(join(dir, `${name}.png`));
   const [w, h] = sizeOf(png);
   const px = rasterize(`data:image/png;base64,${png.toString('base64')}`, w, h, w, h).pixels;
-  const fw = w / count;
-  const boxes = Array.from({ length: count }, () => ({ x0: fw, y0: h, x1: 0, y1: 0 }));
+  const columns = Math.min(count, 8);
+  const rows = Math.ceil(count / columns);
+  const [fw, fh] = [w / columns, h / rows];
+  const cell = (x, y) => Math.floor(y / fh) * columns + Math.floor(x / fw);
+  const boxes = Array.from({ length: count }, () => ({ x0: fw, y0: fh, x1: 0, y1: 0 }));
+  const opaque = (x, y) => px[(y * w + x) * 4 + 3] >= 64;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (px[(y * w + x) * 4 + 3] < 64) continue;
-      const b = boxes[Math.floor(x / fw)];
-      const fx = x % fw;
-      b.x0 = Math.min(b.x0, fx); b.x1 = Math.max(b.x1, fx); b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y);
+      if (!opaque(x, y)) continue;
+      const b = boxes[cell(x, y)];
+      if (!b) continue;
+      const [fx, fy] = [x % fw, y % fh];
+      b.x0 = Math.min(b.x0, fx); b.x1 = Math.max(b.x1, fx); b.y0 = Math.min(b.y0, fy); b.y1 = Math.max(b.y1, fy);
     }
   }
   const all = boxes.reduce((u, b) => ({ x0: Math.min(u.x0, b.x0), y0: Math.min(u.y0, b.y0), x1: Math.max(u.x1, b.x1), y1: Math.max(u.y1, b.y1) }));
   const top = all.y1 - (all.y1 - all.y0) * band;
   let [lx0, lx1] = [fw, 0];
-  for (let y = Math.floor(top); y <= all.y1; y++) {
+  for (let y = 0; y < h; y++) {
+    if (y % fh < top) continue;
     for (let x = 0; x < w; x++) {
-      if (px[(y * w + x) * 4 + 3] < 64) continue;
+      if (!opaque(x, y) || cell(x, y) >= count) continue;
       lx0 = Math.min(lx0, x % fw); lx1 = Math.max(lx1, x % fw);
     }
   }
-  return { fw, fh: h, boxes, all, legsX: (lx0 + lx1) / 2 };
+  return { fw, fh, columns, rows, boxes, all, legsX: (lx0 + lx1) / 2 };
 }

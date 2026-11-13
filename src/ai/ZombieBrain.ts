@@ -192,7 +192,13 @@ export class ZombieBrain {
   private walk(dir: number, speed: number): void {
     this.dir = dir;
     this.z.setVelocityX(dir * speed).setFlipX(dir < 0);
-    this.z.anims.play('zombie-walk', true);
+    if (!this.reacting()) this.z.anims.play('zombie-walk', true);
+  }
+
+  /** True while it flinches from a shot or swipes at the player (clips that play once). */
+  private reacting(): boolean {
+    const key = this.z.anims.currentAnim?.key;
+    return (key === 'zombie-hurt' || key === 'zombie-attack') && this.z.anims.isPlaying;
   }
 
   private stand(): void {
@@ -200,7 +206,7 @@ export class ZombieBrain {
     if (this.climbing) {
       this.z.setVelocityY(0);
       this.z.anims.pause();
-    } else {
+    } else if (!this.reacting()) {
       this.z.anims.stop();
       this.z.setFrame(STAND_FRAME);
     }

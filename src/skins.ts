@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEFAULT_SKIN, REG, RENDER_SCALE, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
-import CLIP_TABLE from './playerClips.json';
+import { PLAYER_CLIPS, clipsEnd, createClipAnims, type Clip } from './clips';
 
 /**
  * Player skins. Every skin's sheet is loaded as `skin-<id>`, and the game itself
@@ -34,46 +34,16 @@ export const PLAYER_HD_FRAMES = {
   total: 70,
 } as const;
 /**
- * Animation clips cut from AI videos, for skins that have them (src/playerClips.json,
- * also read by tools/art, which puts their frames in the sheet after the rigged ones).
- * Each replaces the rigged animation of the same name: idle, run, jump, fall, land,
- * climb, run-pistol, run-shotgun and swing (the machete).
+ * Skins with video clips (see src/clips.ts): each replaces the rigged animation of the same
+ * name: idle, run, jump, fall, land, climb, run-pistol, run-shotgun, idle-pistol,
+ * idle-shotgun, fire-pistol, fire-shotgun, swing (the machete), hurt and death.
  */
-export interface PlayerClip {
-  /** Frames of the 'player' texture, in order. */
-  frames: number[];
-  fps: number;
-  /** Plays once and holds the last frame, instead of looping. */
-  once: boolean;
-  /** For the swing: the frame where the blade lands, timed to the weapon's hitAt. */
-  hitFrame?: number;
-}
-interface ClipSpec {
-  name: string;
-  strip: number;
-  frames?: number[];
-  fps: number;
-  once?: boolean;
-  hitFrame?: number;
-}
-const CLIPS: Partial<Record<SkinId, Record<string, PlayerClip>>> = {};
-let textureFrames: number = PLAYER_HD_FRAMES.total;
-for (const [skin, spec] of Object.entries(CLIP_TABLE) as [SkinId, { clips: ClipSpec[] }][]) {
-  let next = PLAYER_HD_FRAMES.total;
-  const clips: Record<string, PlayerClip> = {};
-  for (const k of spec.clips) {
-    const n = k.frames?.length ?? k.strip;
-    clips[k.name] = { frames: Array.from({ length: n }, (_, i) => next + i), fps: k.fps, once: !!k.once, hitFrame: k.hitFrame };
-    next += n;
-  }
-  CLIPS[skin] = clips;
-  textureFrames = Math.max(textureFrames, next);
-}
+const CLIPS = PLAYER_CLIPS as Partial<Record<SkinId, Record<string, Clip>>>;
 /** Frames in the 'player' texture: the rigged ones and every skin's clips. */
-const TEXTURE_FRAMES = textureFrames;
+const TEXTURE_FRAMES = Math.max(PLAYER_HD_FRAMES.total, ...Object.values(CLIPS).map((c) => clipsEnd(c!)));
 
-/** A clip of the skin being worn (see PlayerClip), if it has that one. */
-export function playerClip(scene: Phaser.Scene, name: string): PlayerClip | undefined {
+/** A clip of the skin being worn (see src/clips.ts), if it has that one. */
+export function playerClip(scene: Phaser.Scene, name: string): Clip | undefined {
   return CLIPS[currentSkin(scene)]?.[name];
 }
 
@@ -182,9 +152,7 @@ export function createPlayerAnims(scene: Phaser.Scene, holding: Record<WeaponId,
   }
   // Each skin's video clips, as player-<clip>-<skin> (playerAnim prefers them).
   for (const [skin, clips] of Object.entries(CLIPS)) {
-    for (const [name, c] of Object.entries(clips!)) {
-      scene.anims.create({ key: `player-${name}-${skin}`, frames: scene.anims.generateFrameNumbers('player', { frames: c.frames }), frameRate: c.fps, repeat: c.once ? 0 : -1 });
-    }
+    createClipAnims(scene, 'player', 'player', Object.fromEntries(Object.entries(clips!).map(([k, c]) => [`${k}-${skin}`, c])));
   }
 }
 

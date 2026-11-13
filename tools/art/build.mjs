@@ -14,11 +14,16 @@ import { svgDoc, g, t } from './svg.mjs';
 import { sheet as vectorHunter } from './hunter.mjs';
 import { PAINTED } from './painted.mjs';
 import { CELL, SHEETS as HOUSE } from './house.mjs';
+import { clipCount, clipSlots } from './clips.mjs';
+import { FRAME } from './hunter.mjs';
+import { part, placeImage } from './parts.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const out = join(root, 'public', 'sprites', 'hd');
 mkdirSync(out, { recursive: true });
 const keepSvg = process.argv.includes('--svg');
+const onlyArg = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
+const only = onlyArg;
 
 const render = (svg, opts = {}) => new Resvg(svg, { font: { loadSystemFonts: false }, ...opts }).render().asPng();
 /**
@@ -78,10 +83,57 @@ function buildTiles(name, { pixel, frames }) {
   console.log(`wrote public/sprites/hd/${name}.png (${Object.keys(frames).length} of ${count} frames redrawn)`);
 }
 
+/**
+ * An enemy sheet: its video clips (src/clips.json) after the frames of its pixel-art sheet,
+ * which stay, scaled up, for moves with no clip yet (a zombie climbing). The first `stand`
+ * cells (the old walk) become frames of the first clip, so code that sets them still works.
+ */
+function buildEnemy(name, spec, stand) {
+  const dir = join(root, 'art', name);
+  const png = readFileSync(join(root, 'public', 'sprites', `${name}.png`));
+  const [pw, ph] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+  const href = `data:image/png;base64,${png.toString('base64')}`;
+  const pixelW = (ph * FRAME.w) / FRAME.h;
+  const { slots, scale } = clipSlots(dir, `${name}_clip_`, spec);
+  const count = spec.start + clipCount(spec);
+  const rows = Math.ceil(count / 10);
+  let body = '';
+  for (let i = 0; i < count; i++) {
+    const at = t((i % 10) * FRAME.w, Math.floor(i / 10) * FRAME.h);
+    const art =
+      i < stand.length ? slots[spec.start + stand[i]].replace(/<defs>.*?<\/defs>/, '') :
+      slots[i] ?? (i < spec.start ? `<svg width="${FRAME.w}" height="${FRAME.h}" viewBox="${i * pixelW} 0 ${pixelW} ${ph}" overflow="hidden"><image href="${href}" width="${pw}" height="${ph}" image-rendering="optimizeSpeed"/></svg>` : '');
+    body += g(at, art);
+  }
+  // The first clip's frames reuse its mask, so define it once, outside every cell.
+  const defs = slots[spec.start].match(/<defs>.*?<\/defs>/)[0];
+  const svg = svgDoc(10 * FRAME.w, rows * FRAME.h, defs + body.replace(/<defs>.*?<\/defs>/g, ''));
+  if (keepSvg) writeFileSync(join(out, `${name}.svg`), svg);
+  writeFileSync(join(out, `${name}.png`), render(svg, atScale));
+  console.log(`wrote public/sprites/hd/${name}.png (${count} frames, clips from ${spec.start})`);
+  return scale;
+}
+
+/** A loose prop at the clips' scale: `width` in source pixels of the clips (halved art). */
+function buildProp(name, file, width, scale) {
+  const p = part(join(root, 'art', name), file, width * scale * 1.25);
+  const w = width * scale;
+  const h = (w * p.h) / p.w;
+  const svg = svgDoc(w, h, placeImage(p, w, 0, 0));
+  writeFileSync(join(out, `${name}-head.png`), render(svg, atScale));
+  console.log(`wrote public/sprites/hd/${name}-head.png`);
+}
+
+const ENEMIES = JSON.parse(readFileSync(join(root, 'src', 'clips.json'), 'utf8')).enemies;
+
 for (const [name, spec] of Object.entries(HOUSE)) buildTiles(name, spec);
+if (!onlyArg || 'zombie'.includes(onlyArg)) {
+  // Zombie: cells 0-3 were the walk (3 is where it stands still); the head is about 0.3x.
+  const scale = buildEnemy('zombie', ENEMIES.zombie, [0, 3, 6, 9]);
+  buildProp('zombie', 'zombie_head', 816 * 0.3 / 2, scale);
+}
 // Painted characters (art/<id>/), and the vector-drawn hunter when his parts are missing.
 const sheets = PAINTED.some((s) => s.name === 'player-hunter') ? PAINTED : [vectorHunter, ...PAINTED];
-const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
 for (const sheet of sheets) {
   if (only && !sheet.name.includes(only)) continue;
   const poses = buildSheet(sheet);
