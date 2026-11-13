@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE, ZOMBIE } from '../config';
 import { EMOTE, emote } from './emote';
+import { flinchPace } from './flinch';
 import type { Cell, NavGrid, Step } from './NavGrid';
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
@@ -48,6 +49,8 @@ export class ZombieBrain {
   private stuckX = 0;
   private stuckY = 0;
   private stuckCount = 0;
+  /** Share of its normal speed it may move at this frame: under 1 while it flinches from a hit. */
+  private pace = 1;
 
   constructor(
     private readonly z: Sprite,
@@ -62,6 +65,14 @@ export class ZombieBrain {
   }
 
   update(time: number): void {
+    this.pace = flinchPace(this.z, 'zombie-hurt', ZOMBIE);
+    // Staggering on the spot isn't being stuck.
+    if (this.pace < 1) {
+      this.stuckCheckAt = time;
+      this.stuckCount = 0;
+      this.stuckX = this.z.x;
+      this.stuckY = this.z.y;
+    }
     this.followStairs();
     const sensed = this.senses();
     if (sensed) this.lastSensedAt = time;
@@ -191,7 +202,7 @@ export class ZombieBrain {
 
   private walk(dir: number, speed: number): void {
     this.dir = dir;
-    this.z.setVelocityX(dir * speed).setFlipX(dir < 0);
+    this.z.setVelocityX(dir * speed * this.pace).setFlipX(dir < 0);
     if (!this.reacting()) this.z.anims.play('zombie-walk', true);
   }
 
@@ -218,7 +229,7 @@ export class ZombieBrain {
       // Gave up halfway up a ladder: carry on to the next floor.
       const here = this.cell();
       if (here && this.world.nav.isStandable(here.x, here.y)) this.finishClimb(here);
-      else this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed);
+      else this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed * this.pace);
       return;
     }
     const nav = this.world.nav;
@@ -309,7 +320,7 @@ export class ZombieBrain {
       this.z.anims.play('zombie-climb');
     }
     this.climbDir = next.y < here.y ? -1 : 1;
-    this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed);
+    this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed * this.pace);
     if (this.z.anims.isPaused) this.z.anims.resume();
   }
 
@@ -319,7 +330,7 @@ export class ZombieBrain {
     const d = (here.y + 1) * TILE - b.bottom;
     if (Math.abs(d) > 1.5) {
       this.climbDir = Math.sign(d);
-      this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed);
+      this.z.setVelocity(0, this.climbDir * ZOMBIE.climbSpeed * this.pace);
       return;
     }
     b.position.y += d;

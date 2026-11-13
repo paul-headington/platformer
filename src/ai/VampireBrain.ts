@@ -155,7 +155,7 @@ export class VampireBrain {
     this.until = time + VAMPIRE.stunTime;
     this.lastSeenAt = time;
     this.face(from);
-    this.v.setVelocityX(-from * 170);
+    this.v.setVelocityX(-from * VAMPIRE.stunKnockback);
   }
 
   // ---------------------------------------------------------------- senses
