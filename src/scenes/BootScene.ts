@@ -88,7 +88,7 @@ export class BootScene extends Phaser.Scene {
     this.anims.create({ key: 'gem-sparkle', frames: frames('gem', [0, 1, 2, 3]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'candle-flicker', frames: frames('candle', [0, 1, 0, 2, 1, 2]), frameRate: 8, repeat: -1 });
 
-    this.scene.start('Game');
+    this.scene.start('Menu');
   }
 
   /** A round, soft-edged pool of light, meant to be drawn with additive blending. */

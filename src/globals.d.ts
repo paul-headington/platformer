@@ -3,3 +3,11 @@ declare const __BUILD_ID__: string;
 
 /** Set by vite.config.ts: package version plus the short git commit, e.g. "v0.1.0 · 1a2b3c4". */
 declare const __VERSION__: string;
+
+/** Set by electron/preload.cjs in the desktop app only. */
+interface Window {
+  desktop?: {
+    /** Closes the app. */
+    quit(): void;
+  };
+}

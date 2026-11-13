@@ -3,6 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH, PLAYER, RENDER_SCALE } from './config';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
+import { MenuScene } from './scenes/MenuScene';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -33,7 +34,7 @@ const game = new Phaser.Game({
       debug: false,
     },
   },
-  scene: [BootScene, GameScene, HudScene],
+  scene: [BootScene, MenuScene, GameScene, HudScene],
 });
 
 // Handy for poking at the game from the browser console while developing.

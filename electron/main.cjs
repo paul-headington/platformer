@@ -1,5 +1,5 @@
 // Desktop wrapper: opens the built web game (dist/) in its own window.
-const { app, BrowserWindow, Menu, net, protocol } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, net, protocol } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -17,7 +17,12 @@ function createWindow() {
     backgroundColor: '#000000',
     title: 'Platformer',
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
   });
   win.loadURL('app://game/index.html');
 
@@ -29,6 +34,9 @@ function createWindow() {
     }
   });
 }
+
+// EXIT on the title screen.
+ipcMain.on('quit', () => app.quit());
 
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {

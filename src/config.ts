@@ -4,6 +4,9 @@
  * bigger and every camera is zoomed by RENDER_SCALE, so high-res art (drawn at RENDER_SCALE
  * pixels per unit) shows at full detail while speeds, sizes and levels keep their units.
  */
+/** The name on the title screen. */
+export const GAME_TITLE = 'HAUNTED MANOR';
+
 export const TILE = 16;
 export const GAME_WIDTH = 256;
 export const GAME_HEIGHT = 160;
