@@ -132,6 +132,8 @@ if (!onlyArg || 'zombie'.includes(onlyArg)) {
   const scale = buildEnemy('zombie', ENEMIES.zombie, [0, 3, 6, 9]);
   buildProp('zombie', 'zombie_head', 816 * 0.3 / 2, scale);
 }
+// Ghost: cells 0-3 were the float.
+if (!onlyArg || 'ghost'.includes(onlyArg)) buildEnemy('ghost', ENEMIES.ghost, [0, 5, 10, 15]);
 // Painted characters (art/<id>/), and the vector-drawn hunter when his parts are missing.
 const sheets = PAINTED.some((s) => s.name === 'player-hunter') ? PAINTED : [vectorHunter, ...PAINTED];
 for (const sheet of sheets) {

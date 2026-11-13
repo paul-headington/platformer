@@ -23,7 +23,14 @@
       {"name": "walk", "file": "walk", "strip": 13, "fps": 12, "anchor": "strip"},
       {"name": "attack", "file": "attack", "strip": 15, "fps": 14, "anchor": "strip", "once": true},
       {"name": "hurt", "file": "hurt", "strip": 10, "fps": 14, "anchor": "strip", "once": true},
-      {"name": "death", "file": "death", "strip": 21, "fps": 12, "anchor": "strip", "once": true, "centre": "all"}
+      {"name": "death", "file": "death", "strip": 21, "fps": 12, "anchor": "strip", "once": true, "centre": "all"},
+      {"name": "climb", "file": "climb", "strip": 20, "fps": 12, "anchor": "strip", "scale": 0.8}
+    ] },
+    "ghost": { "start": 4, "standHeight": 80, "clips": [
+      {"name": "float", "file": "float", "strip": 21, "fps": 12, "anchor": "video", "origin": [182, 64]},
+      {"name": "attack", "file": "attack", "strip": 21, "fps": 14, "anchor": "video", "origin": [10, 40], "once": true},
+      {"name": "hurt", "file": "hurt", "strip": 20, "fps": 16, "anchor": "video", "origin": [28, 50], "once": true},
+      {"name": "death", "file": "death", "strip": 21, "fps": 14, "anchor": "video", "origin": [134, 0], "once": true}
     ] }
   }
 }

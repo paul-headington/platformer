@@ -27,7 +27,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
     this.load.image('machete', `machete.png${v}`);
-    this.load.spritesheet('ghost', `ghost.png${v}`, { frameWidth: 20, frameHeight: 20 });
+    this.load.spritesheet('ghost', `hd/ghost.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
     this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
     this.load.image('key', `key.png${v}`);
     this.load.image('jacket', `jacket.png${v}`);
@@ -35,8 +35,6 @@ export class BootScene extends Phaser.Scene {
     this.load.image('bullet', `bullet.png${v}`);
     this.load.image('shotgun', `shotgun.png${v}`);
     this.load.image('salt', `salt.png${v}`);
-    this.load.spritesheet('fire', `fire.png${v}`, { frameWidth: 20, frameHeight: 26 });
-    this.load.image('ember', `ember.png${v}`);
     this.load.spritesheet('emote', `emote.png${v}`, { frameWidth: 7, frameHeight: 8 });
     for (const sheet of ['tiles', 'back', 'decor', 'candle']) {
       this.load.spritesheet(sheet, `${sheet}.png${v}`, { frameWidth: TILE, frameHeight: TILE });
@@ -77,16 +75,12 @@ export class BootScene extends Phaser.Scene {
       return this.anims.generateFrameNumbers(key, { frames: have.length > 0 ? have : [0] });
     };
     createPlayerAnims(this, PLAYER_HOLDING);
-    // The zombie's video clips: walk, attack, hurt and death (headless already). It climbs
-    // in its old pixel-art frames, scaled up, until it has a climbing clip.
+    // Zombie and ghost video clips: zombie-walk, -climb, -attack, -hurt and -death (headless
+    // already); ghost-float, -attack, -hurt and -death (burning up).
     createClipAnims(this, 'zombie', 'zombie', ENEMY_CLIPS.zombie);
-    this.anims.create({ key: 'zombie-climb', frames: frames('zombie', [4, 5]), frameRate: 4, repeat: -1 });
+    createClipAnims(this, 'ghost', 'ghost', ENEMY_CLIPS.ghost);
     this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
     this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
-    this.anims.create({ key: 'ghost-float', frames: frames('ghost', [0, 1, 0, 1, 2, 3]), frameRate: 4, repeat: -1 });
-    // A ghost burning up: roaring flames three times over, then dying down.
-    const roar = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6];
-    this.anims.create({ key: 'fire-burn', frames: frames('fire', roar), frameRate: 12 });
     this.anims.create({ key: 'gem-sparkle', frames: frames('gem', [0, 1, 2, 3]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'candle-flicker', frames: frames('candle', [0, 1, 0, 2, 1, 2]), frameRate: 8, repeat: -1 });
 

@@ -345,8 +345,9 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case 'g': {
-            const gh = this.ghosts.create(cx, cy, 'ghost', 0) as Sprite;
-            (gh.body as Body).setSize(12, 12).setOffset(4, 3);
+            // High-res: a 20x24-unit cell (the old ghost was 20x20, so the body sits 2 lower in it).
+            const gh = (this.ghosts.create(cx, cy, 'ghost', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (gh.body as Body).setSize(12 * RENDER_SCALE, 12 * RENDER_SCALE).setOffset(4 * RENDER_SCALE, 5 * RENDER_SCALE);
             this.setEnemy(gh, 'ghost').setData('phase', tx).setAlpha(0.85).play('ghost-float');
             break;
           }
@@ -411,9 +412,11 @@ export class GameScene extends Phaser.Scene {
       (_p, e) => {
         const enemy = e as Sprite;
         this.hurt(false, (enemy.getData('stats') as EnemyStats).damage);
-        // A zombie that catches the player swipes at them.
-        if (this.state === 'dying' && enemy.getData('type') === 'zombie' && enemy.anims.currentAnim?.key !== 'zombie-attack') {
-          enemy.play('zombie-attack');
+        // A zombie or ghost that catches the player swipes at them.
+        const type = enemy.getData('type') as EnemyType;
+        if (this.state === 'dying' && (type === 'zombie' || type === 'ghost') && enemy.anims.currentAnim?.key !== `${type}-attack`) {
+          enemy.play(`${type}-attack`);
+          if (type === 'ghost') enemy.anims.chain('ghost-float');
         }
       },
       (_p, e) => this.touchesHurtbox(e as Sprite),
@@ -1447,6 +1450,7 @@ export class GameScene extends Phaser.Scene {
       if (brain instanceof VampireBrain) brain.shot(this.time.now, from || undefined);
       else brain.shot(this.time.now);
       if (brain instanceof ZombieBrain) enemy.play('zombie-hurt');
+      if (brain instanceof GhostBrain) enemy.play('ghost-hurt').anims.chain('ghost-float');
       return;
     }
     this.killEnemy(enemy, from, weapon);
@@ -1463,7 +1467,7 @@ export class GameScene extends Phaser.Scene {
       this.blowHeadOff(enemy, from, weapon !== undefined && !!(WEAPONS[weapon] as WeaponStats).melee);
       return;
     }
-    const body = this.add.image(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
+    const body = this.add.sprite(enemy.x, enemy.y, enemy.texture.key, enemy.frame.name).setScale(enemy.scaleX).setFlipX(enemy.flipX).setAlpha(enemy.alpha);
     enemy.destroy();
     if (stats.death === 'burn') this.burnUp(body);
     else this.tweens.add({ targets: body, alpha: 0, scaleX: 1.8, scaleY: 0.2, duration: 250, onComplete: () => body.destroy() });
@@ -1623,33 +1627,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The rock salt sets a ghost alight: it flares up in flames, glows red and
-   * shrivels away while the fire roars, then the fire dies down and embers float off.
+   * The rock salt sets a ghost alight: she catches fire from the tail up and burns to
+   * embers (her death clip), under a flickering warm glow.
    */
-  private burnUp(ghost: Phaser.GameObjects.Image): void {
+  private burnUp(ghost: Phaser.GameObjects.Sprite): void {
     const { x, y } = ghost;
-    ghost.setTint(0xffa060).setDepth(7);
-    this.tweens.add({ targets: ghost, y: y - 6, scaleX: 0.5, scaleY: 0.8, alpha: 0, duration: BURN_TIME, ease: 'Quad.in', onComplete: () => ghost.destroy() });
-
-    const fire = this.add.sprite(x, y + 8, 'fire', 0).setOrigin(0.5, 1).setDepth(6).play('fire-burn');
-    fire.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => fire.destroy());
+    ghost.setDepth(7).setAlpha(1).play('ghost-death');
+    ghost.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => ghost.destroy());
 
     const glow = this.add.image(x, y, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setScale(1.3).setDepth(4);
     this.tweens.add({ targets: glow, alpha: 0.6, scale: 1.15, duration: 90, yoyo: true, repeat: 4 });
     this.tweens.add({ targets: glow, alpha: 0, delay: BURN_TIME, duration: 400, onComplete: () => glow.destroy() });
-
-    for (let i = 0; i < 8; i++) {
-      const ember = this.add.image(x + Phaser.Math.Between(-6, 6), y + Phaser.Math.Between(-2, 6), 'ember').setDepth(8);
-      this.tweens.add({
-        targets: ember,
-        x: ember.x + Phaser.Math.Between(-10, 10),
-        y: ember.y - Phaser.Math.Between(18, 34),
-        alpha: 0,
-        delay: Phaser.Math.Between(0, BURN_TIME),
-        duration: Phaser.Math.Between(500, 900),
-        onComplete: () => ember.destroy(),
-      });
-    }
   }
 
   private isTouch(): boolean {

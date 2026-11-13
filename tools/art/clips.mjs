@@ -18,6 +18,8 @@ export const clipCount = (spec) => spec.clips.reduce((n, k) => n + (k.frames?.le
  * frame: its lowest point on the ground and its legs centred (or, with "centre": "all", the
  * whole drawing: a body lying flat). A "feet" clip (a jump, where the body moves up and down
  * in the video) puts each frame's lowest point on the ground, as the game moves the body.
+ * A "video" clip (a floating ghost) keeps its place in the source video (`origin`, its crop
+ * there), so every such clip lines up with the first, whose middle is the cell's middle.
  * What reaches past the sides of a cell (a muzzle blast, a swipe) fades out.
  */
 export function clipSlots(dir, prefix, spec) {
@@ -28,6 +30,10 @@ export function clipSlots(dir, prefix, spec) {
   const measure = (k) => stripFrames(dir, `${prefix}${k.file}`, k.strip);
   const ref = measure(spec.clips[0]);
   const base = spec.standHeight / (ref.all.y1 - ref.all.y0); // design units per source pixel
+  // For "video" clips: the middle of the first clip's drawing, in pixels of the source video
+  // (halved, like the art), which goes in the middle of the cell.
+  const origin = (k) => (k.origin ?? [0, 0]).map((v) => v / 2);
+  const mid = [origin(spec.clips[0])[0] + (ref.all.x0 + ref.all.x1) / 2, origin(spec.clips[0])[1] + (ref.all.y0 + ref.all.y1) / 2];
   const slots = {};
   let slot = spec.start;
   for (const k of spec.clips) {
@@ -37,10 +43,13 @@ export function clipSlots(dir, prefix, spec) {
     const sheet = part(dir, `${prefix}${k.file}`, fw * m.columns * PX);
     const sx = sheet.w / m.columns; // one frame, in pixels of the (maybe shrunk) picture
     const sy = sheet.h / m.rows;
-    const x = FRAME.w / 2 + 1 - (k.centre === 'all' ? (m.all.x0 + m.all.x1) / 2 : m.legsX) * scale;
+    const video = k.anchor === 'video';
+    const x = video
+      ? FRAME.w / 2 + (origin(k)[0] - mid[0]) * scale
+      : FRAME.w / 2 + 1 - (k.centre === 'all' ? (m.all.x0 + m.all.x1) / 2 : m.legsX) * scale;
     for (const i of k.frames ?? [...Array(k.strip).keys()]) {
       const bottom = k.anchor === 'feet' ? m.boxes[i].y1 : m.all.y1;
-      const y = GROUND - bottom * scale;
+      const y = video ? FRAME.h / 2 + (origin(k)[1] - mid[1]) * scale : GROUND - bottom * scale;
       slots[slot] =
         (slot === spec.start ? fadeEdges : '') +
         `<g mask="url(#clipfade)"><svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${(i % m.columns) * sx} ${Math.floor(i / m.columns) * sy} ${sx} ${sy}" preserveAspectRatio="none" overflow="hidden">` +
