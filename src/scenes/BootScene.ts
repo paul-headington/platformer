@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, TILE } from '../config';
 import { PLAYER_HOLDING } from './GameScene';
+import { createPlayerTexture, loadSkins } from '../skins';
 
 /**
  * Loads the sprite sheets from public/sprites (all built by tools/sprites.py)
@@ -16,7 +17,8 @@ export class BootScene extends Phaser.Scene {
     // The build id in each URL stops a browser from mixing new code with old cached sprites.
     // Frame layouts are documented in tools/sprites.py.
     const v = `?v=${__BUILD_ID__}`;
-    this.load.spritesheet('player', `player.png${v}`, { frameWidth: 20, frameHeight: 24 });
+    // Every player skin; the 'player' texture is made from the chosen one in create().
+    loadSkins(this.load, v);
     this.load.spritesheet('zombie', `zombie.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
     this.load.image('vampire-head', `vampire-head.png${v}`);
@@ -52,6 +54,7 @@ export class BootScene extends Phaser.Scene {
     this.glow('glow-moon', 64, [140, 160, 255]);
     this.vignette();
     this.slash();
+    createPlayerTexture(this);
 
     // Skips frames the sheet doesn't have (an old cached sheet, say) so a missing frame can't crash the game.
     const frames = (key: string, list: number[]) => {

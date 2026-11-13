@@ -327,4 +327,31 @@ export const REG = {
   /** True while the player is in front of something they can use (a loose book): shows the USE button. */
   canUse: 'canUse',
   message: 'message',
+  /** The SkinId the player is wearing. */
+  skin: 'skin',
 } as const;
+
+// ============================================================================
+// PLAYER SKINS
+// Each skin is a whole player sheet drawn by tools/sprites.py with the same 36
+// frames in the same order, so any skin can stand in for any other. K (or tapping
+// the face next to LIVES) cycles through them; the choice is saved in the browser.
+// To add one: draw it in tools/sprites.py (PLAYER_SKINS), then add it here.
+// ============================================================================
+
+export interface SkinStats {
+  /** Shown when the player switches to it. */
+  name: string;
+  /** The sheet in public/sprites. */
+  sheet: string;
+}
+
+export const SKINS = {
+  hunter: { name: 'GHOST HUNTER', sheet: 'player.png' },
+  weaver: { name: 'THE WEAVER', sheet: 'player-weaver.png' },
+} satisfies Record<string, SkinStats>;
+
+export type SkinId = keyof typeof SKINS;
+
+/** The skin a new player starts with. */
+export const DEFAULT_SKIN: SkinId = 'hunter';

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, REG, WEAPONS, type WeaponId, type WeaponStats } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, REG, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
+import { nextSkin } from '../skins';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
 
@@ -25,7 +26,12 @@ export class HudScene extends Phaser.Scene {
     const style = { fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' };
     this.add.rectangle(0, 0, GAME_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
     this.scoreText = this.add.text(4, 2, '', style);
-    this.livesText = this.add.text(110, 2, '', style);
+    this.livesText = this.add.text(124, 2, '', style);
+    // The player's face beside LIVES: it shows the skin being worn, and clicking or tapping it
+    // (or pressing K) changes skin. It is the head of the player's first frame, so it follows the skin.
+    this.add.image(104, -1, 'player', 0).setOrigin(0, 0).setCrop(4, 1, 13, 11);
+    this.add.zone(100, 0, 64, 14).setOrigin(0, 0).setInteractive().on('pointerdown', () => this.changeSkin());
+    this.input.keyboard?.on('keydown-K', () => this.changeSkin());
     // One icon per weapon, right to left before the key. Tapping or clicking them switches weapons.
     this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
     let right = GAME_WIDTH - 28;
@@ -87,6 +93,17 @@ export class HudScene extends Phaser.Scene {
       if (part.input) part.input.enabled = canUse;
     }
     if (!canUse) pad.release('use');
+  }
+
+  private changeSkin(): void {
+    const id = nextSkin(this);
+    // Say which skin it is, unless a message that must stay up (game over, say) is showing.
+    const current = this.registry.get(REG.message) as HudMessage | undefined;
+    if (!current?.sticky || this.message.alpha === 0) {
+      const how = this.sys.game.device.input.touch ? 'tap the face to change' : 'K to change';
+      const msg: HudMessage = { text: `SKIN: ${SKINS[id].name}\n(${how})`, sticky: false };
+      this.registry.set(REG.message, msg);
+    }
   }
 
   private showMessage(msg: HudMessage): void {
