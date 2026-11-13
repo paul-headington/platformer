@@ -16,6 +16,14 @@ export const GAME_HEIGHT = 160;
  * as they can be. High-res art (tools/art) is rendered at this density.
  */
 export const RENDER_SCALE = 5;
+/**
+ * The player and the monsters are drawn this much bigger than the 20x24-unit frame their
+ * art was designed around: their sheets are built at CHARACTER_PX px per unit of that frame
+ * (see tools/art/build.mjs), so a frame is 30x36 world units and stays sharp. Sizes in
+ * frame units (bodies, offsets) are multiplied by CHARACTER_PX to get texture pixels.
+ */
+export const CHARACTER_SCALE = 1.5;
+export const CHARACTER_PX = RENDER_SCALE * CHARACTER_SCALE;
 /** The HUD keeps its own 320x200 layout, zoomed to fill the same canvas. */
 export const HUD_WIDTH = 320;
 export const HUD_HEIGHT = 200;
@@ -155,11 +163,11 @@ export const WEAPONS = {
     melee: true,
     damage: 20,
     cooldown: 380,
-    reach: 24,
+    reach: 24 * CHARACTER_SCALE,
     swingTime: 260,
     hitAt: 90,
     knockback: 170,
-    hurtbox: { width: 4, height: 16 },
+    hurtbox: { width: 4 * CHARACTER_SCALE, height: 16 * CHARACTER_SCALE },
     icon: 'machete',
   },
 } satisfies Record<string, WeaponStats>;

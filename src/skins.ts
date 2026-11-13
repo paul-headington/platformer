@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEFAULT_SKIN, REG, RENDER_SCALE, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
+import { CHARACTER_PX, DEFAULT_SKIN, REG, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
 import { PLAYER_CLIPS, clipsEnd, createClipAnims, type Clip } from './clips';
 
 /**
@@ -8,18 +8,21 @@ import { PLAYER_CLIPS, clipsEnd, createClipAnims, type Clip } from './clips';
  * copied onto. Swapping skins repaints that canvas, so the player sprite and the HUD
  * face change at once without touching anything that uses them.
  *
- * The canvas is a grid of PLAYER_FRAME-sized frames at RENDER_SCALE pixels per world
- * unit, and the player sprite is drawn at 1 / RENDER_SCALE. A high-res skin (built by
+ * The canvas is a grid of PLAYER_FRAME-sized frames at PLAYER_PX pixels per unit of the
+ * 20x24 frame, and the player sprite is drawn at 1 / RENDER_SCALE, so he comes out
+ * CHARACTER_SCALE times as big as the frame (30x36 world units). A high-res skin (built by
  * tools/art) is copied as it is. An old pixel-art skin (a strip of 20x24 frames from
  * tools/sprites.py) is scaled up frame by frame with crisp pixels.
  */
 const STORAGE_KEY = 'platformer.skin';
 /** One frame of an old pixel-art skin sheet. */
 const PIXEL_FRAME = { w: 20, h: 24 } as const;
+/** Pixels of the 'player' texture per unit of the 20x24 frame (the player is drawn CHARACTER_SCALE times as big). */
+export const PLAYER_PX = CHARACTER_PX;
 /** One frame of the 'player' texture, in high-res pixels. */
-export const PLAYER_FRAME = { w: PIXEL_FRAME.w * RENDER_SCALE, h: PIXEL_FRAME.h * RENDER_SCALE } as const;
-/** Frames per row in a high-res sheet (and the 'player' texture). */
-const COLUMNS = 10;
+export const PLAYER_FRAME = { w: PIXEL_FRAME.w * PLAYER_PX, h: PIXEL_FRAME.h * PLAYER_PX } as const;
+/** Frames per row in a high-res player sheet (and the 'player' texture): wide, so the sheet stays under 4096 px tall for phones. */
+const COLUMNS = 16;
 /** Frames 0-35 mean the same in every skin (see tools/sprites.py); high-res skins add in-betweens after them. */
 const SHARED_FRAMES = 36;
 /**
@@ -89,7 +92,7 @@ export function currentSkin(scene: Phaser.Scene): SkinId {
 /** Which part of frame 0 to show as the face in the HUD, for a skin, in high-res pixels. */
 export function faceCrop(id: SkinId): readonly [number, number, number, number] {
   const [x, y, w, h] = (SKINS[id] as SkinStats).face ?? PIXEL_FACE;
-  return [x * RENDER_SCALE, y * RENDER_SCALE, w * RENDER_SCALE, h * RENDER_SCALE];
+  return [x * PLAYER_PX, y * PLAYER_PX, w * PLAYER_PX, h * PLAYER_PX];
 }
 
 /** Repaints the 'player' texture with a skin and remembers the choice. */
@@ -103,7 +106,7 @@ export function applySkin(scene: Phaser.Scene, id: SkinId): void {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(src, 0, 0);
   } else {
-    // Each pixel becomes a RENDER_SCALE square, so the old art stays crisp.
+    // Each pixel becomes a PLAYER_PX square, so the old art stays crisp.
     ctx.imageSmoothingEnabled = false;
     const count = Math.min(SHARED_FRAMES, Math.floor(src.width / PIXEL_FRAME.w));
     for (let i = 0; i < count; i++) {

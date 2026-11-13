@@ -11,6 +11,8 @@ import {
   GAME_HEIGHT,
   GAME_WIDTH,
   PLAYER,
+  CHARACTER_PX,
+  CHARACTER_SCALE,
   REG,
   RENDER_SCALE,
   SCORE,
@@ -27,7 +29,7 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
-import { playerAnim, playerClip } from '../skins';
+import { PLAYER_PX, playerAnim, playerClip } from '../skins';
 import type { Clip } from '../clips';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -333,28 +335,28 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case 'P':
-            this.spawn.set(cx, bottom - 12);
+            this.spawn.set(cx, bottom - 12 * CHARACTER_SCALE);
             break;
           case 'B':
             this.addLooseBook(tx, ty);
             break;
           case 'z': {
             // High-res like the player: drawn at 1 / RENDER_SCALE, its body sized in texture pixels.
-            const z = (this.zombies.create(cx, bottom - 12, 'zombie', 0) as Sprite).setScale(1 / RENDER_SCALE);
-            (z.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
+            const z = (this.zombies.create(cx, bottom - 12 * CHARACTER_SCALE, 'zombie', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (z.body as Body).setSize(8 * CHARACTER_PX, 20 * CHARACTER_PX).setOffset(6 * CHARACTER_PX, 4 * CHARACTER_PX);
             this.setEnemy(z, 'zombie').play('zombie-walk');
             break;
           }
           case 'g': {
             // High-res: a 20x24-unit cell (the old ghost was 20x20, so the body sits 2 lower in it).
             const gh = (this.ghosts.create(cx, cy, 'ghost', 0) as Sprite).setScale(1 / RENDER_SCALE);
-            (gh.body as Body).setSize(12 * RENDER_SCALE, 12 * RENDER_SCALE).setOffset(4 * RENDER_SCALE, 5 * RENDER_SCALE);
+            (gh.body as Body).setSize(10 * CHARACTER_PX, 10 * CHARACTER_PX).setOffset(5 * CHARACTER_PX, 6 * CHARACTER_PX);
             this.setEnemy(gh, 'ghost').setData('phase', tx).setAlpha(0.85).play('ghost-float');
             break;
           }
           case 'V': {
-            const v = (this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite).setScale(1 / RENDER_SCALE);
-            (v.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
+            const v = (this.vampires.create(cx, bottom - 12 * CHARACTER_SCALE, 'vampire', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (v.body as Body).setSize(8 * CHARACTER_PX, 20 * CHARACTER_PX).setOffset(6 * CHARACTER_PX, 4 * CHARACTER_PX);
             this.setEnemy(v, 'vampire').play('vampire-idle');
             break;
           }
@@ -362,10 +364,12 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    // The 'player' texture is high-res (RENDER_SCALE pixels per unit), so the sprite is
-    // scaled down, and its body is sized in the texture's pixels: 8x22 units, 6 in and 2 down.
+    // The 'player' texture is high-res (PLAYER_PX pixels per unit of the 20x24 frame) and the
+    // sprite is drawn at 1 / RENDER_SCALE, so he is CHARACTER_SCALE times the frame. His body is
+    // sized in the texture's pixels: 8x20 units of the frame, 6 in and 4 down (12x30 in the
+    // world). That leaves the top of his hair out, so he still fits under a ceiling two tiles up.
     this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0).setScale(1 / RENDER_SCALE);
-    (this.player.body as Body).setSize(8 * RENDER_SCALE, 22 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 2 * RENDER_SCALE);
+    (this.player.body as Body).setSize(8 * PLAYER_PX, 20 * PLAYER_PX).setOffset(6 * PLAYER_PX, 4 * PLAYER_PX);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     const world: ZombieWorld = (this.world = {
@@ -1088,8 +1092,8 @@ export class GameScene extends Phaser.Scene {
     this.lastShotAt = time;
     this.fired = true;
     const dir = this.player.flipX ? -1 : 1;
-    const x = this.player.x + dir * 10;
-    const y = this.player.y + 1;
+    const x = this.player.x + dir * 10 * CHARACTER_SCALE;
+    const y = this.player.y + CHARACTER_SCALE;
     for (let i = 0; i < weapon.pellets; i++) {
       // Pellets fan out evenly from the top of the spread to the bottom.
       const angle = weapon.pellets === 1 ? 0 : weapon.spread * (i / (weapon.pellets - 1) - 0.5);
@@ -1121,8 +1125,8 @@ export class GameScene extends Phaser.Scene {
       const front = dir > 0 ? body.right : body.left;
       const hitbox = new Phaser.Geom.Rectangle(Math.min(front, front + dir * blade.reach), body.top - 4, blade.reach, body.height + 4);
 
-      const slash = this.add.image(front + dir * 6, p.y, 'slash').setFlipX(dir < 0).setDepth(11).setAlpha(0.9);
-      this.tweens.add({ targets: slash, alpha: 0, x: slash.x + dir * 4, scaleY: 1.15, duration: 160, onComplete: () => slash.destroy() });
+      const slash = this.add.image(front + dir * 6 * CHARACTER_SCALE, p.y, 'slash').setScale(CHARACTER_SCALE).setFlipX(dir < 0).setDepth(11).setAlpha(0.9);
+      this.tweens.add({ targets: slash, alpha: 0, x: slash.x + dir * 4 * CHARACTER_SCALE, scaleY: 1.15 * CHARACTER_SCALE, duration: 160, onComplete: () => slash.destroy() });
 
       for (const group of this.enemyGroups()) {
         for (const enemy of [...group.getChildren()] as Sprite[]) {
@@ -1490,25 +1494,25 @@ export class GameScene extends Phaser.Scene {
     enemy.destroy();
     // The death clip starts headless: the body twitches, greys and crumbles to an ash pile.
     const body = this.add.sprite(x, feet, 'vampire').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setFlipX(flip).setDepth(5).play('vampire-death');
-    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
+    const head = this.add.image(x + (flip ? -1 : 1), feet - 19 * CHARACTER_SCALE, 'vampire-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
     this.cameras.main.shake(140, 0.006);
 
     // The head: up, over and down to the floor, spinning, then a short roll.
-    const landX = x + away * 30;
+    const landX = x + away * 30 * CHARACTER_SCALE;
     this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 650, ease: 'Linear' });
     this.tweens.chain({
       targets: head,
       tweens: [
         { y: head.y - 16, duration: 230, ease: 'Quad.out' },
-        { y: feet - 5, duration: 420, ease: 'Quad.in' },
-        { y: feet - 8, duration: 120, ease: 'Quad.out', yoyo: true },
+        { y: feet - 5 * CHARACTER_SCALE, duration: 420, ease: 'Quad.in' },
+        { y: feet - 8 * CHARACTER_SCALE, duration: 120, ease: 'Quad.out', yoyo: true },
         { x: landX + away * 8, angle: away * 720, duration: 300, ease: 'Quad.out' },
       ],
       onComplete: () => this.crumble(head, feet, 300),
     });
     // A dark spray from the neck.
     for (let i = 0; i < 6; i++) {
-      const drop = this.add.rectangle(x, feet - 20, 2, 2, 0x5a0c22).setDepth(6);
+      const drop = this.add.rectangle(x, feet - 20 * CHARACTER_SCALE, 2, 2, 0x5a0c22).setDepth(6);
       this.tweens.add({
         targets: drop,
         x: x + away * Phaser.Math.Between(2, 18),
@@ -1538,7 +1542,7 @@ export class GameScene extends Phaser.Scene {
     const flip = from ? from < 0 : enemy.flipX;
     const away = flip ? 1 : -1;
     const { x } = enemy;
-    const neckY = feet - 15;
+    const neckY = feet - 15 * CHARACTER_SCALE;
     enemy.destroy();
 
     // The death clip starts headless: smoke at the neck, a stumble, then flat on its face.
@@ -1551,14 +1555,14 @@ export class GameScene extends Phaser.Scene {
     if (cut) {
       // The head flies off whole, spinning, and rolls to a stop.
       const head = this.add.image(x - away * 1, neckY - 4, 'zombie-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
-      const landX = x + away * 28;
+      const landX = x + away * 28 * CHARACTER_SCALE;
       this.tweens.add({ targets: head, x: landX, angle: away * 540, duration: 600, ease: 'Linear' });
       this.tweens.chain({
         targets: head,
         tweens: [
           { y: head.y - 14, duration: 220, ease: 'Quad.out' },
-          { y: feet - 4, duration: 380, ease: 'Quad.in' },
-          { y: feet - 7, duration: 110, ease: 'Quad.out', yoyo: true },
+          { y: feet - 4 * CHARACTER_SCALE, duration: 380, ease: 'Quad.in' },
+          { y: feet - 7 * CHARACTER_SCALE, duration: 110, ease: 'Quad.out', yoyo: true },
           { x: landX + away * 8, angle: away * 720, duration: 280, ease: 'Quad.out' },
         ],
         onComplete: () => this.tweens.add({

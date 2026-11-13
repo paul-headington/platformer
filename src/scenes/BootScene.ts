@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TILE } from '../config';
+import { CHARACTER_PX, GAME_HEIGHT, GAME_WIDTH, RENDER_SCALE, TILE } from '../config';
 import { PLAYER_HOLDING } from './GameScene';
 import { createPlayerAnims, createPlayerTexture, loadSkins } from '../skins';
 import { ENEMY_CLIPS, createClipAnims } from '../clips';
@@ -20,15 +20,15 @@ export class BootScene extends Phaser.Scene {
     const v = `?v=${__BUILD_ID__}`;
     // Every player skin; the 'player' texture is made from the chosen one in create().
     loadSkins(this.load, v);
-    // High-res, like the player: cells of 20x24 units at RENDER_SCALE (see tools/art).
-    this.load.spritesheet('zombie', `hd/zombie.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
-    this.load.spritesheet('vampire', `hd/vampire.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    // High-res, like the player: cells of 20x24 units at CHARACTER_PX (see tools/art).
+    this.load.spritesheet('zombie', `hd/zombie.png${v}`, { frameWidth: 20 * CHARACTER_PX, frameHeight: 24 * CHARACTER_PX });
+    this.load.spritesheet('vampire', `hd/vampire.png${v}`, { frameWidth: 20 * CHARACTER_PX, frameHeight: 24 * CHARACTER_PX });
     this.load.image('vampire-head', `hd/vampire-head.png${v}`);
     this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
     // Pickups and shots are high-res: drawn at 1 / RENDER_SCALE.
     this.load.image('machete', `hd/machete.png${v}`);
-    this.load.spritesheet('ghost', `hd/ghost.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    this.load.spritesheet('ghost', `hd/ghost.png${v}`, { frameWidth: 20 * CHARACTER_PX, frameHeight: 24 * CHARACTER_PX });
     this.load.spritesheet('gem', `hd/gem.png${v}`, { frameWidth: 8 * RENDER_SCALE, frameHeight: 8 * RENDER_SCALE });
     this.load.image('key', `hd/key.png${v}`);
     this.load.image('jacket', `hd/jacket.png${v}`);

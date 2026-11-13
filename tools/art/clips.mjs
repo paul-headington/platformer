@@ -20,9 +20,10 @@ export const clipCount = (spec) => spec.clips.reduce((n, k) => n + (k.frames?.le
  * in the video) puts each frame's lowest point on the ground, as the game moves the body.
  * A "video" clip (a floating ghost) keeps its place in the source video (`origin`, its crop
  * there), so every such clip lines up with the first, whose middle is the cell's middle.
- * What reaches past the sides of a cell (a muzzle blast, a swipe) fades out.
+ * What reaches past the sides of a cell (a muzzle blast, a swipe) fades out. `px` is the
+ * final pixels per design unit of the sheet (bigger for the player, see build.mjs).
  */
-export function clipSlots(dir, prefix, spec) {
+export function clipSlots(dir, prefix, spec, px = PX) {
   const e = 5 / FRAME.w;
   const fadeEdges =
     `<defs><linearGradient id="clipfadeg"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="${e}" stop-color="#fff"/><stop offset="${1 - e}" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>` +
@@ -43,7 +44,7 @@ export function clipSlots(dir, prefix, spec) {
     const m = measure(k);
     const scale = base * (k.scale ?? 1); // some videos framed the character a little smaller
     const [fw, fh] = [m.fw * scale, m.fh * scale];
-    const sheet = part(dir, `${prefix}${k.file}`, fw * m.columns * PX);
+    const sheet = part(dir, `${prefix}${k.file}`, fw * m.columns * px);
     const sx = sheet.w / m.columns; // one frame, in pixels of the (maybe shrunk) picture
     const sy = sheet.h / m.rows;
     const video = k.anchor === 'video';
