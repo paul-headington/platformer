@@ -32,7 +32,10 @@ function buildSheet(s) {
   const { w, h } = s.frame;
   const rows = Math.ceil(s.count / s.columns);
   const poses = s.frames();
-  const body = poses.map((pose, i) => (pose ? g(t((i % s.columns) * w, Math.floor(i / s.columns) * h), s.draw(pose)) : '')).join('');
+  const video = s.videoFrames?.() ?? {};
+  const body = poses
+    .map((pose, i) => (pose ? g(t((i % s.columns) * w, Math.floor(i / s.columns) * h), video[i] ?? s.draw(pose)) : ''))
+    .join('');
   const svg = svgDoc(s.columns * w, rows * h, body);
   if (keepSvg) writeFileSync(join(out, `${s.name}.svg`), svg);
   writeFileSync(join(out, `${s.name}.png`), render(svg, atScale));

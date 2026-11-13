@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FOREARM, FRAME, GROUND, HIP, UPPER_ARM, bend, frames, softLimb } from './hunter.mjs';
-import { bottomCentre, part, placeImage } from './parts.mjs';
+import { bottomCentre, part, placeImage, stripBounds } from './parts.mjs';
 import { chainEnd, ellipse, g, id, r, t, tr } from './svg.mjs';
 
 const ART = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'art');
@@ -127,7 +127,32 @@ function character(c) {
     );
   }
 
-  return { name: c.sheet, frame: FRAME, columns: 10, count: 70, frames, draw, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
+  /**
+   * Frames taken from a video clip instead of the rig (c.video): a strip of `count` frames
+   * in art/<id>/, every `step`-th one used, in order, for the listed sheet slots. The whole
+   * strip is scaled as one, so the body stays registered from frame to frame: as tall as
+   * `height` design units, its lowest point on the ground, centred on `centreX`.
+   */
+  function videoFrames() {
+    const v = c.video;
+    if (!v) return {};
+    const b = stripBounds(dir, `${c.id}_${v.file}`, v.count);
+    const fh = v.height / (b.y1 - b.y0); // one source frame's height, in design units
+    const fw = fh * b.aspect;
+    const sheet = part(dir, `${c.id}_${v.file}`, fw * v.count * PX);
+    const x = v.centreX - ((b.x0 + b.x1) / 2) * fw;
+    const y = GROUND - b.y1 * fh;
+    const slots = {};
+    v.slots.forEach((slot, i) => {
+      const k = i * v.step;
+      slots[slot] =
+        `<svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${k * (sheet.w / v.count)} 0 ${sheet.w / v.count} ${sheet.h}" preserveAspectRatio="none" overflow="hidden">` +
+        `<image href="${sheet.href}" width="${sheet.w}" height="${sheet.h}" image-rendering="optimizeQuality"/></svg>`;
+    });
+    return slots;
+  }
+
+  return { name: c.sheet, frame: FRAME, columns: 10, count: 70, frames, draw, videoFrames, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
 }
 
 const HUNTER = character({
@@ -141,6 +166,9 @@ const HUNTER = character({
   // Leather sleeves with rolled cuffs, and jeans, in colours from the design sheet.
   arm: { fill: '#6f4b3a', back: '#5b3c2e', cuff: '#82593f', line: '#432820', width: 6 },
   leg: { fill: '#566884', back: '#46556e', line: '#2b2d3c', width: 8 },
+  // The unarmed run comes from an AI video clip (Minimax, 24 frames per stride): every
+  // third frame fills the eight run slots (2, 40, 3, 41, ... in play order, see src/skins.ts).
+  video: { file: 'run_24f', count: 24, step: 3, slots: [2, 40, 3, 41, 4, 42, 5, 43], height: 89, centreX: 42 },
 });
 
 /** A loose lock of hair hanging from (x, y), swinging with the hair. */

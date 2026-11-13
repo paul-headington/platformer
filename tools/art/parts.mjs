@@ -60,3 +60,23 @@ export function placeImage(p, width, fx, fy, extra = '') {
   const height = (width * p.h) / p.w;
   return `<image href="${p.href}" x="${(-fx * width).toFixed(2)}" y="${(-fy * height).toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}" image-rendering="optimizeQuality" preserveAspectRatio="none" ${extra}/>`;
 }
+
+/**
+ * The box around everything drawn in a strip of `count` equal frames (all frames together),
+ * as fractions of one frame: { x0, y0, x1, y1 }.
+ */
+export function stripBounds(dir, name, count) {
+  const png = readFileSync(join(dir, `${name}.png`));
+  const [w, h] = sizeOf(png);
+  const px = rasterize(`data:image/png;base64,${png.toString('base64')}`, w, h, w, h).pixels;
+  const fw = w / count;
+  let [x0, y0, x1, y1] = [fw, h, 0, 0];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] < 64) continue;
+      const fx = x % fw;
+      x0 = Math.min(x0, fx); x1 = Math.max(x1, fx); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+  }
+  return { x0: x0 / fw, y0: y0 / h, x1: x1 / fw, y1: y1 / h, aspect: fw / h };
+}
