@@ -349,6 +349,7 @@ export interface SkinStats {
 export const SKINS = {
   hunter: { name: 'GHOST HUNTER', sheet: 'player.png' },
   weaver: { name: 'THE WEAVER', sheet: 'player-weaver.png' },
+  ink: { name: 'INK', sheet: 'player-ink.png' },
 } satisfies Record<string, SkinStats>;
 
 export type SkinId = keyof typeof SKINS;
