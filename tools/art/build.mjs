@@ -33,13 +33,14 @@ function buildSheet(s) {
   const rows = Math.ceil(s.count / s.columns);
   const poses = s.frames();
   const video = s.videoFrames?.() ?? {};
-  const body = poses
-    .map((pose, i) => (pose ? g(t((i % s.columns) * w, Math.floor(i / s.columns) * h), video[i] ?? s.draw(pose)) : ''))
-    .join('');
+  const body = Array.from({ length: s.count }, (_, i) => {
+    const art = video[i] ?? (poses[i] ? s.draw(poses[i]) : '');
+    return art ? g(t((i % s.columns) * w, Math.floor(i / s.columns) * h), art) : '';
+  }).join('');
   const svg = svgDoc(s.columns * w, rows * h, body);
   if (keepSvg) writeFileSync(join(out, `${s.name}.svg`), svg);
   writeFileSync(join(out, `${s.name}.png`), render(svg, atScale));
-  console.log(`wrote public/sprites/hd/${s.name}.png (${poses.filter(Boolean).length} frames)`);
+  console.log(`wrote public/sprites/hd/${s.name}.png (${poses.filter(Boolean).length} rigged, ${Object.keys(video).length} video frames)`);
   return poses;
 }
 

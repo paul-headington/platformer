@@ -26,7 +26,7 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
-import { playerAnim } from '../skins';
+import { playerAnim, playerClip, type PlayerClip } from '../skins';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
 // Tile indexes in the 'tiles' sheet (see TILE_SHEETS in tools/sprites.py).
@@ -89,6 +89,25 @@ const ZOMBIE_CORPSE = { lie: 1400, fade: 500 } as const;
 const GORE = { skin: 0, scalp: 1, eye: 2, goo: 3, tooth: 4 } as const;
 /** How long a burning ghost takes to burn away (ms); the flames take a little longer to die down. */
 const BURN_TIME = 900;
+
+/** Plays a once-through animation from the start, unless it is already on (playing or held at its end). */
+function playOnce(sprite: Phaser.GameObjects.Sprite, key: string): void {
+  if (sprite.anims.currentAnim?.key !== key) sprite.anims.play(key);
+}
+
+/**
+ * The frame of a video swing clip `elapsed` ms into a swing: the wind-up runs until the
+ * blade's hitAt, when the clip reaches its hitFrame, and the follow-through fills the rest.
+ */
+function swingFrame(clip: PlayerClip, elapsed: number, blade: BladeStats): number {
+  const n = clip.frames.length;
+  const hit = clip.hitFrame ?? Math.floor(n / 2);
+  const i =
+    elapsed < blade.hitAt
+      ? (elapsed / blade.hitAt) * hit
+      : hit + ((elapsed - blade.hitAt) / (blade.swingTime - blade.hitAt)) * (n - hit);
+  return clip.frames[Phaser.Math.Clamp(Math.floor(i), 0, n - 1)];
+}
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -164,6 +183,9 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   /** The swing in progress, if any: when it started and when it ends. */
   private swingStartedAt = -Infinity;
+  /** Landing: the player was in the air last frame, and the landing clip plays until landUntil. */
+  private wasAirborne = false;
+  private landUntil = -Infinity;
   private swingUntil = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
@@ -904,15 +926,27 @@ export class GameScene extends Phaser.Scene {
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     const held = this.heldWeapon();
+    // A skin with video clips has its own jump, fall and landing, when empty-handed.
+    const rise = body.velocity.y < 0;
+    const airClip = !held && playerClip(this, rise ? 'jump' : 'fall');
+    const land = !held && playerClip(this, 'land');
+    if (onGround && this.wasAirborne && land) this.landUntil = time + (land.frames.length / land.fps) * 1000;
+    this.wasAirborne = !onGround;
     if (time < this.swingUntil) {
       p.anims.stop();
-      const hitAt = (WEAPONS.machete as BladeStats).hitAt;
-      p.setFrame(time - this.swingStartedAt < hitAt ? MACHETE_SWING.raise : MACHETE_SWING.strike);
+      const blade = WEAPONS.machete as BladeStats;
+      const swing = playerClip(this, 'swing');
+      if (swing) p.setFrame(swingFrame(swing, time - this.swingStartedAt, blade));
+      else p.setFrame(time - this.swingStartedAt < blade.hitAt ? MACHETE_SWING.raise : MACHETE_SWING.strike);
+    } else if (!onGround && airClip) {
+      playOnce(p, playerAnim(this, rise ? 'player-jump' : 'player-fall'));
     } else if (!onGround) {
       p.anims.stop();
-      p.setFrame((body.velocity.y < 0 ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
+      p.setFrame((rise ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
       p.anims.play(playerAnim(this, held ? `player-run-${held}` : 'player-run'), true);
+    } else if (land && time < this.landUntil) {
+      playOnce(p, playerAnim(this, 'player-land'));
     } else {
       p.anims.play(playerAnim(this, held ? `player-idle-${held}` : 'player-idle'), true);
     }

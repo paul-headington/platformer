@@ -6,14 +6,19 @@
 // Each character is a config: sizes in design units (4 per world unit), anchor points as
 // fractions of each picture, limb colours, and optional extras drawn at fixed layers.
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FOREARM, FRAME, GROUND, HIP, UPPER_ARM, bend, frames, softLimb } from './hunter.mjs';
-import { bottomCentre, part, placeImage, stripBounds } from './parts.mjs';
+import { bottomCentre, part, placeImage, stripFrames } from './parts.mjs';
 import { chainEnd, ellipse, g, id, r, t, tr } from './svg.mjs';
 
-const ART = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'art');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ART = join(ROOT, 'art');
+/** Animation clips cut from AI videos, per character (shared with the game, see src/skins.ts). */
+const CLIPS = JSON.parse(readFileSync(join(ROOT, 'src', 'playerClips.json'), 'utf8'));
+/** Where the clip frames start in a sheet: after the rigged frames (PLAYER_HD_FRAMES.total in src/skins.ts). */
+const CLIP_START = 70;
 /** Final pixels per design unit (RENDER_SCALE / 4, see build.mjs). */
 const PX = 1.25;
 const FACES = { smile: 'smile', open: 'open', o: 'o', grit: 'grit', smirk: 'smirk' };
@@ -128,31 +133,42 @@ function character(c) {
   }
 
   /**
-   * Frames taken from a video clip instead of the rig (c.video): a strip of `count` frames
-   * in art/<id>/, every `step`-th one used, in order, for the listed sheet slots. The whole
-   * strip is scaled as one, so the body stays registered from frame to frame: as tall as
-   * `height` design units, its lowest point on the ground, centred on `centreX`.
+   * Frames cut from AI video clips (src/playerClips.json), placed in the sheet after the
+   * rigged frames, clip after clip. Every clip is drawn at one scale (times its own `scale`,
+   * if any), set so that the idle stands `standHeight` design units tall. An "anchor": "strip" clip is placed as one, so
+   * the body stays registered from frame to frame: its lowest point on the ground and its
+   * legs centred. A "feet" clip (a jump, where the body moves up and down in the video) puts
+   * each frame's lowest point on the ground, as the game moves the body itself.
    */
-  function videoFrames() {
-    const v = c.video;
-    if (!v) return {};
-    const b = stripBounds(dir, `${c.id}_${v.file}`, v.count);
-    const fh = v.height / (b.y1 - b.y0); // one source frame's height, in design units
-    const fw = fh * b.aspect;
-    const sheet = part(dir, `${c.id}_${v.file}`, fw * v.count * PX);
-    const x = v.centreX - ((b.x0 + b.x1) / 2) * fw;
-    const y = GROUND - b.y1 * fh;
+  function clipFrames() {
+    const spec = CLIPS[c.id];
+    if (!spec) return {};
+    const measure = (file, count) => stripFrames(dir, `${c.id}_clip_${file}`, count);
+    const idle = spec.clips.find((k) => k.name === 'idle');
+    const ref = measure(idle.file, idle.strip);
+    const base = spec.standHeight / (ref.all.y1 - ref.all.y0); // design units per source pixel
     const slots = {};
-    v.slots.forEach((slot, i) => {
-      const k = i * v.step;
-      slots[slot] =
-        `<svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${k * (sheet.w / v.count)} 0 ${sheet.w / v.count} ${sheet.h}" preserveAspectRatio="none" overflow="hidden">` +
-        `<image href="${sheet.href}" width="${sheet.w}" height="${sheet.h}" image-rendering="optimizeQuality"/></svg>`;
-    });
+    let slot = CLIP_START;
+    for (const k of spec.clips) {
+      const m = measure(k.file, k.strip);
+      const scale = base * (k.scale ?? 1); // some videos framed the hunter a little smaller
+      const [fw, fh] = [m.fw * scale, m.fh * scale];
+      const sheet = part(dir, `${c.id}_clip_${k.file}`, fw * k.strip * PX);
+      const sx = sheet.w / k.strip; // one frame's width in the (maybe shrunk) picture
+      const x = FRAME.w / 2 + 1 - m.legsX * scale;
+      for (const i of k.frames ?? [...Array(k.strip).keys()]) {
+        const bottom = k.anchor === 'feet' ? m.boxes[i].y1 : m.all.y1;
+        const y = GROUND - bottom * scale;
+        slots[slot++] =
+          `<svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${i * sx} 0 ${sx} ${sheet.h}" preserveAspectRatio="none" overflow="hidden">` +
+          `<image href="${sheet.href}" width="${sheet.w}" height="${sheet.h}" image-rendering="optimizeQuality"/></svg>`;
+      }
+    }
     return slots;
   }
 
-  return { name: c.sheet, frame: FRAME, columns: 10, count: 70, frames, draw, videoFrames, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
+  const clipCount = (CLIPS[c.id]?.clips ?? []).reduce((n, k) => n + (k.frames?.length ?? k.strip), 0);
+  return { name: c.sheet, frame: FRAME, columns: 10, count: CLIP_START + clipCount, frames, draw, videoFrames: clipFrames, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
 }
 
 const HUNTER = character({
@@ -166,9 +182,6 @@ const HUNTER = character({
   // Leather sleeves with rolled cuffs, and jeans, in colours from the design sheet.
   arm: { fill: '#6f4b3a', back: '#5b3c2e', cuff: '#82593f', line: '#432820', width: 6 },
   leg: { fill: '#566884', back: '#46556e', line: '#2b2d3c', width: 8 },
-  // The unarmed run comes from an AI video clip (Minimax, 24 frames per stride): every
-  // third frame fills the eight run slots (2, 40, 3, 41, ... in play order, see src/skins.ts).
-  video: { file: 'run_24f', count: 24, step: 3, slots: [2, 40, 3, 41, 4, 42, 5, 43], height: 89, centreX: 42 },
 });
 
 /** A loose lock of hair hanging from (x, y), swinging with the hair. */

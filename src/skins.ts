@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEFAULT_SKIN, REG, RENDER_SCALE, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
+import CLIP_TABLE from './playerClips.json';
 
 /**
  * Player skins. Every skin's sheet is loaded as `skin-<id>`, and the game itself
@@ -32,6 +33,50 @@ export const PLAYER_HD_FRAMES = {
   held: { pistol: 46, shotgun: 54, machete: 62 } as Record<WeaponId, number>,
   total: 70,
 } as const;
+/**
+ * Animation clips cut from AI videos, for skins that have them (src/playerClips.json,
+ * also read by tools/art, which puts their frames in the sheet after the rigged ones).
+ * Each replaces the rigged animation of the same name: idle, run, jump, fall, land,
+ * climb, run-pistol, run-shotgun and swing (the machete).
+ */
+export interface PlayerClip {
+  /** Frames of the 'player' texture, in order. */
+  frames: number[];
+  fps: number;
+  /** Plays once and holds the last frame, instead of looping. */
+  once: boolean;
+  /** For the swing: the frame where the blade lands, timed to the weapon's hitAt. */
+  hitFrame?: number;
+}
+interface ClipSpec {
+  name: string;
+  strip: number;
+  frames?: number[];
+  fps: number;
+  once?: boolean;
+  hitFrame?: number;
+}
+const CLIPS: Partial<Record<SkinId, Record<string, PlayerClip>>> = {};
+let textureFrames: number = PLAYER_HD_FRAMES.total;
+for (const [skin, spec] of Object.entries(CLIP_TABLE) as [SkinId, { clips: ClipSpec[] }][]) {
+  let next = PLAYER_HD_FRAMES.total;
+  const clips: Record<string, PlayerClip> = {};
+  for (const k of spec.clips) {
+    const n = k.frames?.length ?? k.strip;
+    clips[k.name] = { frames: Array.from({ length: n }, (_, i) => next + i), fps: k.fps, once: !!k.once, hitFrame: k.hitFrame };
+    next += n;
+  }
+  CLIPS[skin] = clips;
+  textureFrames = Math.max(textureFrames, next);
+}
+/** Frames in the 'player' texture: the rigged ones and every skin's clips. */
+const TEXTURE_FRAMES = textureFrames;
+
+/** A clip of the skin being worn (see PlayerClip), if it has that one. */
+export function playerClip(scene: Phaser.Scene, name: string): PlayerClip | undefined {
+  return CLIPS[currentSkin(scene)]?.[name];
+}
+
 /** The default face crop in the HUD (world units): the head of an old pixel-art skin. */
 const PIXEL_FACE = [4, 1, 13, 11] as const;
 
@@ -53,9 +98,9 @@ export function loadSkins(load: Phaser.Loader.LoaderPlugin, version: string): vo
 
 /** Makes the 'player' texture, cut into frames like a sprite sheet, wearing the saved skin. */
 export function createPlayerTexture(scene: Phaser.Scene): void {
-  const rows = Math.ceil(PLAYER_HD_FRAMES.total / COLUMNS);
+  const rows = Math.ceil(TEXTURE_FRAMES / COLUMNS);
   const tex = scene.textures.createCanvas('player', COLUMNS * PLAYER_FRAME.w, rows * PLAYER_FRAME.h)!;
-  for (let i = 0; i < PLAYER_HD_FRAMES.total; i++) {
+  for (let i = 0; i < TEXTURE_FRAMES; i++) {
     tex.add(i, 0, (i % COLUMNS) * PLAYER_FRAME.w, Math.floor(i / COLUMNS) * PLAYER_FRAME.h, PLAYER_FRAME.w, PLAYER_FRAME.h);
   }
   applySkin(scene, savedSkin());
@@ -135,9 +180,17 @@ export function createPlayerAnims(scene: Phaser.Scene, holding: Record<WeaponId,
     make(`player-idle-${weapon}-hd`, [first, e, e + 1, first + 1, e + 2, e + 3], 5);
     make(`player-run-${weapon}-hd`, [first + 2, e + 4, first + 3, e + 5, first + 4, e + 6, first + 5, e + 7], 16);
   }
+  // Each skin's video clips, as player-<clip>-<skin> (playerAnim prefers them).
+  for (const [skin, clips] of Object.entries(CLIPS)) {
+    for (const [name, c] of Object.entries(clips!)) {
+      scene.anims.create({ key: `player-${name}-${skin}`, frames: scene.anims.generateFrameNumbers('player', { frames: c.frames }), frameRate: c.fps, repeat: c.once ? 0 : -1 });
+    }
+  }
 }
 
 /** The key of one of the player's animations, in the version that suits the skin being worn. */
 export function playerAnim(scene: Phaser.Scene, key: string): string {
-  return isHd(currentSkin(scene)) ? `${key}-hd` : key;
+  const skin = currentSkin(scene);
+  if (scene.anims.exists(`${key}-${skin}`)) return `${key}-${skin}`;
+  return isHd(skin) ? `${key}-hd` : key;
 }

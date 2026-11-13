@@ -62,21 +62,33 @@ export function placeImage(p, width, fx, fy, extra = '') {
 }
 
 /**
- * The box around everything drawn in a strip of `count` equal frames (all frames together),
- * as fractions of one frame: { x0, y0, x1, y1 }.
+ * Measures a strip of `count` equal frames: { fw, fh } (one frame, in pixels), the box
+ * around each frame's drawing and around all of them together ({ x0, y0, x1, y1 } in
+ * pixels of one frame), and `legsX`: the middle, across all frames, of what is drawn in
+ * the lowest `band` of the union box (the legs, a steadier centre than arms or blades).
  */
-export function stripBounds(dir, name, count) {
+export function stripFrames(dir, name, count, band = 0.3) {
   const png = readFileSync(join(dir, `${name}.png`));
   const [w, h] = sizeOf(png);
   const px = rasterize(`data:image/png;base64,${png.toString('base64')}`, w, h, w, h).pixels;
   const fw = w / count;
-  let [x0, y0, x1, y1] = [fw, h, 0, 0];
+  const boxes = Array.from({ length: count }, () => ({ x0: fw, y0: h, x1: 0, y1: 0 }));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (px[(y * w + x) * 4 + 3] < 64) continue;
+      const b = boxes[Math.floor(x / fw)];
       const fx = x % fw;
-      x0 = Math.min(x0, fx); x1 = Math.max(x1, fx); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      b.x0 = Math.min(b.x0, fx); b.x1 = Math.max(b.x1, fx); b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y);
     }
   }
-  return { x0: x0 / fw, y0: y0 / h, x1: x1 / fw, y1: y1 / h, aspect: fw / h };
+  const all = boxes.reduce((u, b) => ({ x0: Math.min(u.x0, b.x0), y0: Math.min(u.y0, b.y0), x1: Math.max(u.x1, b.x1), y1: Math.max(u.y1, b.y1) }));
+  const top = all.y1 - (all.y1 - all.y0) * band;
+  let [lx0, lx1] = [fw, 0];
+  for (let y = Math.floor(top); y <= all.y1; y++) {
+    for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] < 64) continue;
+      lx0 = Math.min(lx0, x % fw); lx1 = Math.max(lx1, x % fw);
+    }
+  }
+  return { fw, fh: h, boxes, all, legsX: (lx0 + lx1) / 2 };
 }
