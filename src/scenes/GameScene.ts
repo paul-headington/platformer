@@ -833,7 +833,7 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     return axis === 'x'
       ? cam.clampX(this.cameraTarget.x - cam.width / 2)
-      : cam.clampY(this.cameraTarget.y - cam.height / 2);
+      : cam.clampY(this.cameraTarget.y - CAMERA.lookUp - cam.height / 2);
   }
 
   private updatePlayer(time: number): void {

@@ -32,8 +32,8 @@ export const PLAYER_HD_FRAMES = {
   held: { pistol: 46, shotgun: 54, machete: 62 } as Record<WeaponId, number>,
   total: 70,
 } as const;
-/** The default face crop in the HUD: the head of an old pixel-art skin, scaled up. */
-const PIXEL_FACE = [4, 1, 13, 11].map((n) => n * RENDER_SCALE) as unknown as readonly [number, number, number, number];
+/** The default face crop in the HUD (world units): the head of an old pixel-art skin. */
+const PIXEL_FACE = [4, 1, 13, 11] as const;
 
 export const skinIds = Object.keys(SKINS) as SkinId[];
 
@@ -71,9 +71,10 @@ export function currentSkin(scene: Phaser.Scene): SkinId {
   return (scene.registry.get(REG.skin) as SkinId | undefined) ?? savedSkin();
 }
 
-/** Which part of frame 0 to show as the face in the HUD, for a skin. */
+/** Which part of frame 0 to show as the face in the HUD, for a skin, in high-res pixels. */
 export function faceCrop(id: SkinId): readonly [number, number, number, number] {
-  return (SKINS[id] as SkinStats).face ?? PIXEL_FACE;
+  const [x, y, w, h] = (SKINS[id] as SkinStats).face ?? PIXEL_FACE;
+  return [x * RENDER_SCALE, y * RENDER_SCALE, w * RENDER_SCALE, h * RENDER_SCALE];
 }
 
 /** Repaints the 'player' texture with a skin and remembers the choice. */

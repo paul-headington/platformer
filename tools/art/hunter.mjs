@@ -6,7 +6,7 @@
 // its joint; a pose says how far each joint turns. Angles are in degrees, 0 = hanging
 // straight down, negative = swung forward (the hunter faces right).
 
-import { chainEnd, clipped, ellipse, g, id, limb, path, r, stroke, t, tr, vgrad } from './svg.mjs';
+import { chainEnd, clipped, ellipse, g, path, r, stroke, t, tr, vgrad } from './svg.mjs';
 
 export const FRAME = { w: 80, h: 96 };
 const GROUND = 95;
@@ -147,31 +147,54 @@ function torsoBack({ coat = 0 }) {
   );
 }
 
+/** Where a two-part limb's joint and tip end up: [joint, tip], from (0,0) hanging down. */
+function bend(len1, a1, len2, a2) {
+  const j = chainEnd(0, 0, [[len1, a1]]);
+  const tip = chainEnd(0, 0, [[len1, a1], [len2, a2]]);
+  return [j, tip];
+}
+
+/**
+ * A whole limb as one smooth curve from the root, around the joint, to the tip, so it
+ * bends like a soft sleeve instead of two pinned segments. The curve hugs the joint
+ * closely, so the limb keeps its length and pose.
+ */
+function softLimb(j, tip, width, fill, line, lineWidth = 1.3) {
+  const lerp = (a, b, k) => [a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k];
+  const c1 = lerp({ x: 0, y: 0 }, j, 0.78);
+  const c2 = lerp(tip, j, 0.78);
+  const d = `M0 0 C${c1[0].toFixed(2)} ${c1[1].toFixed(2)} ${c2[0].toFixed(2)} ${c2[1].toFixed(2)} ${tip.x.toFixed(2)} ${tip.y.toFixed(2)}`;
+  return (
+    `<path d="${d}" fill="none" stroke="${line}" stroke-width="${width + lineWidth * 2}" stroke-linecap="round"/>` +
+    `<path d="${d}" fill="none" stroke="${fill}" stroke-width="${width}" stroke-linecap="round"/>`
+  );
+}
+
 /** An arm hanging from the shoulder (0,0): sleeve, cuff, hand. `item` is drawn in the hand. */
 function arm({ shoulder, elbow, back = false, item = null, fist = true }) {
   const fill = back ? C.jacketShade : C.jacket;
   const hand = ellipse(0, 1.2, 2.7, 2.9, back ? C.skinShade : C.skin, C.skinLine, 1.1) + (fist ? stroke('M-1.5 0.6 Q0 1.6 1.6 0.6', C.skinLine, 0.7) : '');
-  return g(r(shoulder),
-    limb(UPPER_ARM, 6, fill, C.jacketLine),
-    g(tr(0, UPPER_ARM, elbow),
-      limb(FOREARM - 1.5, 5.4, fill, C.jacketLine),
-      ellipse(0, FOREARM - 1.6, 3.2, 1.4, back ? C.jacketShade : C.jacketHi, C.jacketLine, 1),
-      g(t(0, FOREARM), item && item.under ? item.svg : '', hand, item && !item.under ? item.svg : '')));
+  const [j, wrist] = bend(UPPER_ARM, shoulder, FOREARM - 1.5, shoulder + elbow);
+  const handAt = chainEnd(0, 0, [[UPPER_ARM, shoulder], [FOREARM, elbow]]);
+  return (
+    softLimb(j, wrist, 5.8, fill, C.jacketLine) +
+    // Covers the round end of the sleeve at the shoulder, so it reads as part of the jacket, not a pin.
+    ellipse(0, 0.4, 3.3, 3.1, fill) +
+    g(tr(wrist.x, wrist.y, shoulder + elbow), ellipse(0, -0.1, 3.2, 1.4, back ? C.jacketShade : C.jacketHi, C.jacketLine, 1)) +
+    g(tr(handAt.x, handAt.y, shoulder + elbow), item && item.under ? item.svg : '', hand, item && !item.under ? item.svg : '')
+  );
 }
 
-/** A leg hanging from the hip (0,0): thigh, shin, boot. */
+/** A leg hanging from the hip (0,0): one soft trouser leg and a boot. */
 function leg({ hip, knee, back = false, toe = 0 }) {
   const fill = back ? C.jeansShade : C.jeans;
-  const boot = g(r(-knee - hip + toe),
+  const boot = g(r(toe),
     path('M-4 -2 L3.6 -2 C6 -1 9 0 9.4 2.4 C9.6 4 8.4 4.6 6.4 4.6 L-4 4.6 C-4.8 3 -4.8 0 -4 -2 Z', back ? C.bootShade : C.boot, C.bootLine, 1.2) +
     path('M-4.3 3.2 L9.4 3.2 C9.2 4.4 8.4 4.8 6.4 4.8 L-4 4.8 Z', C.sole) +
     stroke('M-4.2 -1 L3.4 -1', back ? C.bootLine : C.bootShade, 1));
-  return g(r(hip),
-    limb(THIGH, 7.5, fill, C.jeansLine),
-    g(tr(0, THIGH, knee),
-      limb(SHIN - 3, 6.6, fill, C.jeansLine),
-      stroke('M-3.6 3 L-2.6 6', C.jeansLine, 0.6, 'opacity="0.5"'),
-      g(t(0, SHIN - 1.5), boot)));
+  const [j, ankle] = bend(THIGH, hip, SHIN - 2.5, hip + knee);
+  const bootAt = chainEnd(0, 0, [[THIGH, hip], [SHIN - 1.5, knee]]);
+  return softLimb(j, ankle, 7, fill, C.jeansLine) + g(t(bootAt.x, bootAt.y), boot);
 }
 
 // ------------------------------------------------------------------ items in hand

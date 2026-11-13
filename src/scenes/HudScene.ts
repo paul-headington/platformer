@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, REG, RENDER_SCALE, TEXT_RES, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
+import { HUD_HEIGHT, HUD_SCALE, HUD_WIDTH, REG, RENDER_SCALE, TEXT_RES, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
 import { currentSkin, faceCrop, nextSkin } from '../skins';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
@@ -25,10 +25,10 @@ export class HudScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Laid out in world units like the game: the camera zooms them up from the top-left corner.
-    this.cameras.main.setOrigin(0, 0).setZoom(RENDER_SCALE);
+    // Laid out on a 320x200 grid: the camera zooms it up from the top-left corner to fill the canvas.
+    this.cameras.main.setOrigin(0, 0).setZoom(HUD_SCALE);
     const style = { ...TEXT_RES, fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' };
-    this.add.rectangle(0, 0, GAME_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
+    this.add.rectangle(0, 0, HUD_WIDTH, 11, 0x000000, 0.6).setOrigin(0, 0);
     this.scoreText = this.add.text(4, 2, '', style);
     this.livesText = this.add.text(124, 2, '', style);
     // The player's face beside LIVES: it shows the skin being worn, and clicking or tapping it
@@ -39,7 +39,7 @@ export class HudScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-K', () => this.changeSkin());
     // One icon per weapon, right to left before the key. Tapping or clicking them switches weapons.
     this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
-    let right = GAME_WIDTH - 28;
+    let right = HUD_WIDTH - 28;
     for (const id of (Object.keys(WEAPONS) as WeaponId[]).reverse()) {
       const icon = this.add.image(right, 6, WEAPONS[id].icon).setOrigin(1, 0.5);
       right -= icon.displayWidth + 6;
@@ -47,17 +47,17 @@ export class HudScene extends Phaser.Scene {
     }
     const iconsLeft = right + 2;
     this.add
-      .zone(iconsLeft, 0, GAME_WIDTH - 24 - iconsLeft, 14)
+      .zone(iconsLeft, 0, HUD_WIDTH - 24 - iconsLeft, 14)
       .setOrigin(0, 0)
       .setInteractive()
       .on('pointerdown', () => {
         pad.press('switch');
         pad.release('switch');
       });
-    this.keyIcon = this.add.image(GAME_WIDTH - 12, 5, 'key');
+    this.keyIcon = this.add.image(HUD_WIDTH - 12, 5, 'key');
 
     this.message = this.add
-      .text(GAME_WIDTH / 2, 70, '', { ...style, align: 'center', stroke: '#000000', strokeThickness: 3, lineSpacing: 4 })
+      .text(HUD_WIDTH / 2, 70, '', { ...style, align: 'center', stroke: '#000000', strokeThickness: 3, lineSpacing: 4 })
       .setOrigin(0.5, 0.5);
 
     this.registry.events.on('changedata', this.onChange, this);
@@ -66,7 +66,7 @@ export class HudScene extends Phaser.Scene {
 
     // Faint build version in the bottom-right corner, so it's easy to tell which build is running.
     this.add
-      .text(GAME_WIDTH - 2, GAME_HEIGHT - 1, __VERSION__, { ...TEXT_RES, fontFamily: 'monospace', fontSize: '6px', color: '#ffffff' })
+      .text(HUD_WIDTH - 2, HUD_HEIGHT - 1, __VERSION__, { ...TEXT_RES, fontFamily: 'monospace', fontSize: '6px', color: '#ffffff' })
       .setOrigin(1, 1)
       .setAlpha(0.35);
 
@@ -130,17 +130,17 @@ export class HudScene extends Phaser.Scene {
     this.input.addPointer(3); // up to four fingers at once
     // A d-pad on the left (up and down climb ladders), FIRE and JUMP on the right.
     const cx = 48;
-    const cy = GAME_HEIGHT - 44;
+    const cy = HUD_HEIGHT - 44;
     const tri = (x: number, y: number, ...pts: number[]) => this.add.triangle(x, y, ...pts, 0xffffff);
     this.touchButton('left', cx - 26, cy, (x, by) => tri(x, by, 6, 0, 6, 12, 0, 6), 13, { x: 18, w: 36, h: 40 });
     this.touchButton('right', cx + 26, cy, (x, by) => tri(x, by, 0, 0, 0, 12, 6, 6), 13, { x: 78, w: 36, h: 40 });
     this.touchButton('up', cx, cy - 24, (x, by) => tri(x, by, 0, 6, 12, 6, 6, 0), 13, { y: cy - 28, w: 28, h: 32 });
     this.touchButton('down', cx, cy + 24, (x, by) => tri(x, by, 0, 0, 12, 0, 6, 6), 13, { y: cy + 28, w: 28, h: 32 });
-    const y = GAME_HEIGHT - 28;
-    this.fireLabel = this.touchButton('fire', GAME_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'))[1] as Phaser.GameObjects.Text;
-    this.touchButton('jump', GAME_WIDTH - 26, y, (x, by) => this.labelFor(x, by, 'JUMP'));
+    const y = HUD_HEIGHT - 28;
+    this.fireLabel = this.touchButton('fire', HUD_WIDTH - 70, y, (x, by) => this.labelFor(x, by, 'FIRE'))[1] as Phaser.GameObjects.Text;
+    this.touchButton('jump', HUD_WIDTH - 26, y, (x, by) => this.labelFor(x, by, 'JUMP'));
     // USE sits above and between them, and only appears in front of something usable.
-    this.useButton = this.touchButton('use', GAME_WIDTH - 48, y - 42, (x, by) => this.labelFor(x, by, 'USE'), 14, { w: 36, h: 26 });
+    this.useButton = this.touchButton('use', HUD_WIDTH - 48, y - 42, (x, by) => this.labelFor(x, by, 'USE'), 14, { w: 36, h: 26 });
 
     // A tap away from the buttons restarts after winning or losing.
     this.input.on('pointerdown', (_p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {

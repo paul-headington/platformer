@@ -5,9 +5,18 @@
  * pixels per unit) shows at full detail while speeds, sizes and levels keep their units.
  */
 export const TILE = 16;
-export const GAME_WIDTH = 320;
-export const GAME_HEIGHT = 200;
-export const RENDER_SCALE = 4;
+export const GAME_WIDTH = 256;
+export const GAME_HEIGHT = 160;
+/**
+ * High-res pixels per world unit, and the game camera's zoom. 5 makes the 1280x800 canvas show
+ * 256x160 units: a room (9 tiles, 144 units) still fits top to bottom, with characters as big
+ * as they can be. High-res art (tools/art) is rendered at this density.
+ */
+export const RENDER_SCALE = 5;
+/** The HUD keeps its own 320x200 layout, zoomed to fill the same canvas. */
+export const HUD_WIDTH = 320;
+export const HUD_HEIGHT = 200;
+export const HUD_SCALE = (GAME_WIDTH * RENDER_SCALE) / HUD_WIDTH;
 /** Text style settings that keep small text sharp on the zoomed-in cameras. */
 export const TEXT_RES = { resolution: RENDER_SCALE } as const;
 
@@ -38,6 +47,11 @@ export const CAMERA = {
   lerp: 0.12,
   /** The camera never moves slower than this (px/s) until it arrives, so scrolls end cleanly. */
   minSpeed: 60,
+  /**
+   * How far above the player the camera centres (world units), so the floor they stand on
+   * sits near the bottom of the screen and the room above them, up to its ceiling, is in view.
+   */
+  lookUp: 48,
 };
 
 // ============================================================================
@@ -367,12 +381,12 @@ export interface SkinStats {
    * Without it the sheet is the old 20x24 pixel-art strip, scaled up with crisp pixels.
    */
   hd?: boolean;
-  /** The part of frame 0 shown as the face in the HUD, in high-res pixels: x, y, width, height. */
+  /** The part of frame 0 shown as the face in the HUD, in world units (a frame is 20x24): x, y, width, height. */
   face?: readonly [number, number, number, number];
 }
 
 export const SKINS = {
-  hunter: { name: 'GHOST HUNTER', sheet: 'hd/player-hunter.png', hd: true, face: [14, 2, 52, 44] },
+  hunter: { name: 'GHOST HUNTER', sheet: 'hd/player-hunter.png', hd: true, face: [3.5, 0.5, 13, 11] },
   weaver: { name: 'THE WEAVER', sheet: 'player-weaver.png' },
   ink: { name: 'INK', sheet: 'player-ink.png' },
 } satisfies Record<string, SkinStats>;

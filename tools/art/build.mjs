@@ -19,6 +19,12 @@ mkdirSync(out, { recursive: true });
 const keepSvg = process.argv.includes('--svg');
 
 const render = (svg, opts = {}) => new Resvg(svg, { font: { loadSystemFonts: false }, ...opts }).render().asPng();
+/**
+ * The art is designed at 4 px per world unit (a tile is 64, the player frame 80x96) and
+ * rendered at the game's RENDER_SCALE (src/config.ts) px per unit. Keep the two in step.
+ */
+const RENDER_SCALE = 5;
+const atScale = { fitTo: { mode: 'zoom', value: RENDER_SCALE / 4 } };
 
 function buildSheet(s) {
   const { w, h } = s.frame;
@@ -27,7 +33,7 @@ function buildSheet(s) {
   const body = poses.map((pose, i) => (pose ? g(t((i % s.columns) * w, Math.floor(i / s.columns) * h), s.draw(pose)) : '')).join('');
   const svg = svgDoc(s.columns * w, rows * h, body);
   if (keepSvg) writeFileSync(join(out, `${s.name}.svg`), svg);
-  writeFileSync(join(out, `${s.name}.png`), render(svg));
+  writeFileSync(join(out, `${s.name}.png`), render(svg, atScale));
   console.log(`wrote public/sprites/hd/${s.name}.png (${poses.filter(Boolean).length} frames)`);
   return poses;
 }
@@ -61,7 +67,7 @@ function buildTiles(name, { pixel, frames }) {
   }
   const svg = svgDoc(count * CELL, CELL, body);
   if (keepSvg) writeFileSync(join(out, `${name}.svg`), svg);
-  writeFileSync(join(out, `${name}.png`), render(svg));
+  writeFileSync(join(out, `${name}.png`), render(svg, atScale));
   console.log(`wrote public/sprites/hd/${name}.png (${Object.keys(frames).length} of ${count} frames redrawn)`);
 }
 
