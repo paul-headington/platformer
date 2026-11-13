@@ -40,17 +40,18 @@ export function part(dir, name, drawWidth) {
   return p;
 }
 
-/** The middle of the lowest opaque rows of a part, as fractions of its size (where a chin or a hem ends). */
-export function bottomCentre(dir, name, band = 0.04) {
+/** The middle of the lowest opaque rows of a part (between x0 and x1, as fractions), as fractions of its size: where a chin or a hem ends. */
+export function bottomCentre(dir, name, band = 0.04, [x0, x1] = [0, 1]) {
   const png = readFileSync(join(dir, `${name}.png`));
   const [w, h] = sizeOf(png);
   const img = rasterize(`data:image/png;base64,${png.toString('base64')}`, w, h, w, h);
   const px = img.pixels;
+  const [xa, xb] = [Math.floor(x0 * w), Math.ceil(x1 * w)];
   let bottom = 0;
-  for (let y = h - 1; y >= 0 && !bottom; y--) for (let x = 0; x < w; x++) if (px[(y * w + x) * 4 + 3] > 128) { bottom = y; break; }
+  for (let y = h - 1; y >= 0 && !bottom; y--) for (let x = xa; x < xb; x++) if (px[(y * w + x) * 4 + 3] > 128) { bottom = y; break; }
   let sum = 0;
   let n = 0;
-  for (let y = Math.floor(bottom - h * band); y <= bottom; y++) for (let x = 0; x < w; x++) if (px[(y * w + x) * 4 + 3] > 128) { sum += x; n++; }
+  for (let y = Math.floor(bottom - h * band); y <= bottom; y++) for (let x = xa; x < xb; x++) if (px[(y * w + x) * 4 + 3] > 128) { sum += x; n++; }
   return { x: sum / n / w, y: bottom / h };
 }
 

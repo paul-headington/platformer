@@ -6,19 +6,15 @@
 // its joint; a pose says how far each joint turns. Angles are in degrees, 0 = hanging
 // straight down, negative = swung forward (the hunter faces right).
 
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bottomCentre, part, placeImage } from './parts.mjs';
 import { chainEnd, clipped, ellipse, g, path, r, stroke, t, tr, vgrad } from './svg.mjs';
 
 export const FRAME = { w: 80, h: 96 };
-const GROUND = 95;
-const HIP = 68; // hip height when standing straight
+export const GROUND = 95;
+export const HIP = 68; // hip height when standing straight
 const THIGH = 11;
 const SHIN = 10.5;
-const UPPER_ARM = 8.5;
-const FOREARM = 7.5;
+export const UPPER_ARM = 8.5;
+export const FOREARM = 7.5;
 
 const C = {
   skin: '#ffe6d6', skinShade: '#f5c3ae', skinLine: '#9a5a48', blush: '#ff8f8f',
@@ -152,7 +148,7 @@ function torsoBack({ coat = 0 }) {
 }
 
 /** Where a two-part limb's joint and tip end up: [joint, tip], from (0,0) hanging down. */
-function bend(len1, a1, len2, a2) {
+export function bend(len1, a1, len2, a2) {
   const j = chainEnd(0, 0, [[len1, a1]]);
   const tip = chainEnd(0, 0, [[len1, a1], [len2, a2]]);
   return [j, tip];
@@ -163,7 +159,7 @@ function bend(len1, a1, len2, a2) {
  * bends like a soft sleeve instead of two pinned segments. The curve hugs the joint
  * closely, so the limb keeps its length and pose.
  */
-function softLimb(j, tip, width, fill, line, lineWidth = 1.3) {
+export function softLimb(j, tip, width, fill, line, lineWidth = 1.3) {
   const lerp = (a, b, k) => [a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k];
   const c1 = lerp({ x: 0, y: 0 }, j, 0.78);
   const c2 = lerp(tip, j, 0.78);
@@ -238,7 +234,6 @@ const machete = (angle) => ({
  *  ground: true = drop the body so the lowest boot rests on the floor; back: seen from behind.
  */
 export function frame(p) {
-  if (PAINTED) return paintedFrame(p);
   const pose = { bob: 0, lean: 0, nod: 0, armF: [10, -20], armB: [-8, -20], legF: [-4, 4], legB: [4, 4], hair: 0, coat: 0, face: {}, ground: true, ...p };
   let hipY = HIP + pose.bob;
   if (pose.ground) {
@@ -373,115 +368,5 @@ export function frames() {
   return f;
 }
 
+/** The vector-drawn hunter, used when art/hunter/ has no painted parts. */
 export const sheet = { name: 'player-hunter', frame: FRAME, columns: 10, count: 70, frames, draw: frame };
-
-// ------------------------------------------------------------------ painted parts
-//
-// When art/hunter/ holds painted parts (see /docs and the AI art guide), the head, torso,
-// hands and boots are those pictures, and only the sleeves and jeans are drawn here, as
-// smooth curves in colours picked from the painted design sheet.
-
-const ART = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'art', 'hunter');
-const PAINTED = existsSync(join(ART, 'hunter_head_smile.png'));
-/** Final pixels per design unit (see RENDER_SCALE in build.mjs). */
-const PX = 1.25;
-const P = {
-  sleeve: '#6f4b3a', sleeveBack: '#5b3c2e', cuff: '#82593f', line: '#432820',
-  jeans: '#566884', jeansBack: '#46556e', jeansLine: '#2b2d3c',
-};
-/** Sizes (design units) and anchor points (fractions of each picture) of the painted parts. */
-const SIZE = { head: 45, torso: 21.5, fist: 6.8, boot: 15 };
-/** Painted-art legs are shorter, for chibi proportions. */
-const LEG = { thigh: 8.5, shin: 7.5, width: 8 };
-const TORSO = {
-  hip: [0.5, 0.86], // where the hips are, on the belt line
-  neck: [0.56, 0.05],
-  shoulderF: [0.09, 0.27], // the near armhole
-  shoulderB: [0.93, 0.24],
-  hipF: [0.37, 0.92], hipB: [0.62, 0.92],
-};
-const FIST = { centre: [0.47, 0.52], turn: 62 };
-const BOOT = { ankle: [0.3, 0.22] };
-const BOOT_H = (SIZE.boot * 281) / 368;
-const SOLE = BOOT_H * (1 - BOOT.ankle[1]);
-
-const img = (name, units) => part(ART, name, units * PX);
-const torsoH = () => (SIZE.torso * img('hunter_torso', SIZE.torso).h) / img('hunter_torso', SIZE.torso).w;
-/** A point of the torso picture, relative to the hips, in design units. */
-function torsoPoint([fx, fy]) {
-  const h = torsoH();
-  return { x: (fx - TORSO.hip[0]) * SIZE.torso, y: (fy - TORSO.hip[1]) * h };
-}
-
-const FACES = { smile: 'smile', open: 'open', o: 'o', grit: 'grit', smirk: 'smirk' };
-function paintedHead(face) {
-  const name = face.eyes === 'wince' ? 'hunter_head_wince' : `hunter_head_${FACES[face.mouth] ?? 'smile'}`;
-  const chin = bottomCentre(ART, name);
-  // The neck joint sits a little above the chin, so the head overlaps the collar.
-  return placeImage(img(name, SIZE.head), SIZE.head, chin.x, chin.y - 0.06);
-}
-
-function paintedArm({ shoulder, elbow, back = false, item = null }) {
-  const fill = back ? P.sleeveBack : P.sleeve;
-  const [j, wrist] = bend(UPPER_ARM, shoulder, FOREARM - 2, shoulder + elbow);
-  const handAt = chainEnd(0, 0, [[UPPER_ARM, shoulder], [FOREARM, elbow]]);
-  const fist = g(r(FIST.turn), placeImage(img('hunter_hand_fist', SIZE.fist), SIZE.fist, FIST.centre[0], FIST.centre[1], back ? 'opacity="0.92"' : ''));
-  return (
-    softLimb(j, wrist, 6, fill, P.line, 1.2) +
-    g(tr(handAt.x, handAt.y, shoulder + elbow), item && item.under ? item.svg : '', g(t(0, 0.6), fist), item && !item.under ? item.svg : '') +
-    // The rolled-up cuff, over the wrist.
-    g(tr(wrist.x, wrist.y, shoulder + elbow), ellipse(0, 0.2, 3.6, 1.8, back ? P.sleeveBack : P.cuff, P.line, 1))
-  );
-}
-
-function paintedLeg({ hip, knee, back = false, toe = 0 }) {
-  const [j, ankle] = bend(LEG.thigh, hip, LEG.shin, hip + knee);
-  const boot = g(t(ankle.x, ankle.y), g(r(toe), placeImage(img('hunter_boot', SIZE.boot), SIZE.boot, BOOT.ankle[0], BOOT.ankle[1], back ? 'opacity="0.9"' : '')));
-  return boot + softLimb(j, { x: ankle.x, y: ankle.y + 1 }, LEG.width, back ? P.jeansBack : P.jeans, P.jeansLine, 1.2);
-}
-
-function paintedFrame(p) {
-  const pose = { bob: 0, lean: 0, nod: 0, armF: [10, -20], armB: [-8, -20], legF: [-4, 4], legB: [4, 4], face: {}, ground: true, ...p };
-  let hipY = HIP + pose.bob;
-  if (pose.ground) {
-    const legTop = torsoPoint(TORSO.hipF).y;
-    const sole = (h, k) => legTop + chainEnd(0, 0, [[LEG.thigh, h], [LEG.shin, k]]).y + SOLE;
-    hipY = GROUND - Math.max(sole(...pose.legF), sole(...pose.legB)) + Math.min(0, pose.bob);
-  }
-  const x = 40 + (pose.dx ?? 0);
-  const torsoPic = (name) => placeImage(img(name, SIZE.torso), SIZE.torso, TORSO.hip[0], TORSO.hip[1]);
-  const at = (pt, ...c) => g(t(pt.x, pt.y), ...c);
-  const torsoT = (...c) => g(tr(x, hipY, pose.lean), ...c);
-
-  if (pose.back) {
-    const hf = torsoPoint(TORSO.hipF);
-    const neck = torsoPoint(TORSO.neck);
-    return (
-      g(t(x - 3, hipY + hf.y), paintedLeg({ hip: pose.legB[0], knee: pose.legB[1], back: true, toe: 0 })) +
-      g(t(x + 3, hipY + hf.y), g('scale(-1 1)', paintedLeg({ hip: pose.legF[0], knee: pose.legF[1], back: true, toe: 0 }))) +
-      torsoT(
-        g(t(-9, neck.y + 6), paintedArm({ shoulder: pose.armB[0], elbow: pose.armB[1] })),
-        g(t(9, neck.y + 6), g('scale(-1 1)', paintedArm({ shoulder: pose.armF[0], elbow: pose.armF[1] }))),
-        torsoPic('hunter_torso_back'),
-        g(t(0.5, neck.y + 2), placeImage(img('hunter_head_back', SIZE.head * 0.86), SIZE.head * 0.86, 0.5, 0.97)),
-      )
-    );
-  }
-
-  const neck = torsoPoint(TORSO.neck);
-  // In the painted torso the near armhole is on the back edge and the far one on the front
-  // edge, so the leading arm (armF, which holds the weapon) hangs from the far, front one.
-  // leadOnTop: the leading arm is raised in front of the head (a machete about to come down).
-  const lead = at(torsoPoint(TORSO.shoulderB), paintedArm({ shoulder: pose.armF[0], elbow: pose.armF[1], back: !pose.leadOnTop, item: pose.itemF }));
-  return (
-    torsoT(pose.leadOnTop ? '' : lead) +
-    g(t(x, hipY), at(torsoPoint(TORSO.hipB), paintedLeg({ hip: pose.legB[0], knee: pose.legB[1], back: true }))) +
-    g(t(x, hipY), at(torsoPoint(TORSO.hipF), paintedLeg({ hip: pose.legF[0], knee: pose.legF[1] }))) +
-    torsoT(
-      torsoPic('hunter_torso'),
-      g(tr(neck.x, neck.y, pose.nod), paintedHead(pose.face)),
-      at(torsoPoint(TORSO.shoulderF), paintedArm({ shoulder: pose.armB[0], elbow: pose.armB[1], item: pose.itemB })),
-      pose.leadOnTop ? lead : '',
-    )
-  );
-}

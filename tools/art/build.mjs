@@ -4,13 +4,15 @@
 //
 //   node tools/art/build.mjs            all sheets, plus docs/hd-preview.png
 //   node tools/art/build.mjs --svg      also write the SVG next to each PNG, for debugging
+//   node tools/art/build.mjs --only=ink just the sheets whose name contains 'ink'
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Resvg } from '@resvg/resvg-js';
 import { svgDoc, g, t } from './svg.mjs';
-import { sheet as hunter } from './hunter.mjs';
+import { sheet as vectorHunter } from './hunter.mjs';
+import { PAINTED } from './painted.mjs';
 import { CELL, SHEETS as HOUSE } from './house.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -45,8 +47,9 @@ function preview(s, poses, pick) {
   const floor = (i) => `<rect x="${i * w}" y="${h - 1}" width="${w}" height="1" fill="#5a4a6a"/>`;
   const body = pick.map((n, i) => floor(i) + g(t(i * w, 0), s.draw(poses[n]))).join('');
   const svg = svgDoc(pick.length * w, h, bg + body);
-  writeFileSync(join(root, 'docs', 'hd-preview.png'), render(svg, { fitTo: { mode: 'zoom', value: 3 } }));
-  console.log('wrote docs/hd-preview.png');
+  const file = s.name === 'player-hunter' ? 'hd-preview.png' : `hd-preview-${s.name.replace('player-', '')}.png`;
+  writeFileSync(join(root, 'docs', file), render(svg, { fitTo: { mode: 'zoom', value: 3 } }));
+  console.log(`wrote docs/${file}`);
 }
 
 /**
@@ -72,5 +75,11 @@ function buildTiles(name, { pixel, frames }) {
 }
 
 for (const [name, spec] of Object.entries(HOUSE)) buildTiles(name, spec);
-const poses = buildSheet(hunter);
-preview(hunter, poses, [0, 1, 2, 40, 3, 41, 6, 7, 8, 10, 18, 26, 34, 35]);
+// Painted characters (art/<id>/), and the vector-drawn hunter when his parts are missing.
+const sheets = PAINTED.some((s) => s.name === 'player-hunter') ? PAINTED : [vectorHunter, ...PAINTED];
+const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
+for (const sheet of sheets) {
+  if (only && !sheet.name.includes(only)) continue;
+  const poses = buildSheet(sheet);
+  preview(sheet, poses, [0, 1, 2, 40, 3, 41, 6, 7, 8, 10, 18, 26, 34, 35]);
+}
