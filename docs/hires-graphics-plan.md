@@ -2,15 +2,28 @@
 
 Status: draft for Paul's approval. Branch: `claude/project-thread-2sirg5`. Nothing is implemented yet.
 
-## 0. Target style (open question)
+## 0. Target style: anime chibi
 
-I couldn't open the YouTube link from here (YouTube is blocked from my sandbox), so the
-target style is not pinned down yet. Everything below works for any 2D style (clean
-vector cartoon, thick-outline comic, painted HD, chibi, etc.). Once Paul describes the
-look or drops 2-3 screenshots in the thread, I'll fill in a one-page style guide:
-proportions (head-to-body ratio), outline weight, shading (flat / cel / painted),
-palette and how expressive faces are. We match the style only and keep every
-character original.
+From Paul's example animation (a 25 s green-screen dance clip of a chibi character):
+
+- **Proportions:** chibi, about 2.5 to 3 heads tall. Big round head, small body, short
+  limbs, small feet. Fits our characters well, since the game sprite is already only
+  about 1.5 tiles tall and a big head reads clearly at that size.
+- **Faces:** large eyes with gradient irises and a white highlight, tiny nose, small
+  mouth; very expressive (closed happy eyes, open-mouth shout, side glance).
+- **Line art:** thin, clean, smooth lines in a dark tint of the fill colour (dark brown
+  for hair/skin), not heavy black outlines.
+- **Shading:** flat cel shading, one shadow tone per colour plus a soft hair highlight.
+  No textures or painterly brushwork.
+- **Palette:** soft, light and slightly pastel, with one or two strong accents (red).
+  For the haunted house we keep that character palette and put it against the moonlit
+  rooms so characters pop.
+- **Motion:** smooth, bouncy, many in-betweens; hair, skirt and accessories swing and
+  settle (secondary motion); weight shifts and squash on steps. It looks like a
+  cutout/mesh rig (Live2D-style) mixed with redrawn key poses for turns.
+
+We match this style only. The characters stay ours: the hunter, Weaver and Ink, plus
+the monsters, all redrawn as chibis (cute-spooky for the enemies).
 
 ## 1. Resolution and scaling
 
@@ -41,6 +54,14 @@ Recommended: **vector parts + a cutout rig, baked to frames by a build script.**
   gradually; the old script keeps working until each sheet is replaced.
 - Hand-painted or AI-assisted PNG frames can drop into the same atlas folders if Paul
   wants a look vectors can't do.
+- Chibi anime suits a cutout rig very well (it's how most animations in this style are
+  made): the head, bangs, side hair, eyes, mouth, torso, skirt/coat, arms and legs are
+  separate parts. Expressions are swappable eye and mouth parts. Hair and cloth get a
+  little spring simulation in the bake so they swing and settle like the example.
+- Honest caveat: drawing appealing anime faces as hand-written SVG is the hardest part
+  for me. The proof of concept will show whether my vector drawing hits the bar. If it
+  doesn't, the fallback is that Paul (or an artist, or an image tool he likes) supplies
+  the parts as layered PNGs and the same rig and pipeline animates them.
 
 Why not the alternatives:
 - Runtime skeletal (Spine): smoothest motion, but it's a paid licence and its Phaser 4
