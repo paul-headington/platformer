@@ -32,6 +32,13 @@ const render = (svg, opts = {}) => new Resvg(svg, { font: { loadSystemFonts: fal
  */
 const RENDER_SCALE = 5;
 const atScale = { fitTo: { mode: 'zoom', value: RENDER_SCALE / 4 } };
+/**
+ * Characters (the player and the monsters) are drawn CHARACTER_SCALE times bigger in the game
+ * (src/config.ts), so their sheets are rendered that much denser. Keep the two in step.
+ */
+const CHARACTER_SCALE = 1.5;
+const CHARACTER_PX = (RENDER_SCALE / 4) * CHARACTER_SCALE;
+const atCharacterScale = { fitTo: { mode: 'zoom', value: CHARACTER_PX } };
 
 function buildSheet(s) {
   const { w, h } = s.frame;
@@ -95,7 +102,7 @@ function buildEnemy(name, spec, stand) {
   const [pw, ph] = [png.readUInt32BE(16), png.readUInt32BE(20)];
   const href = `data:image/png;base64,${png.toString('base64')}`;
   const pixelW = (ph * FRAME.w) / FRAME.h;
-  const { slots, scale } = clipSlots(dir, `${name}_clip_`, spec);
+  const { slots, scale } = clipSlots(dir, `${name}_clip_`, spec, CHARACTER_PX);
   const count = spec.start + clipCount(spec);
   const rows = Math.ceil(count / 10);
   let body = '';
@@ -110,18 +117,18 @@ function buildEnemy(name, spec, stand) {
   const defs = slots[spec.start].match(/<defs>.*?<\/defs>/)[0];
   const svg = svgDoc(10 * FRAME.w, rows * FRAME.h, defs + body.replace(/<defs>.*?<\/defs>/g, ''));
   if (keepSvg) writeFileSync(join(out, `${name}.svg`), svg);
-  writeFileSync(join(out, `${name}.png`), render(svg, atScale));
+  writeFileSync(join(out, `${name}.png`), render(svg, atCharacterScale));
   console.log(`wrote public/sprites/hd/${name}.png (${count} frames, clips from ${spec.start})`);
   return scale;
 }
 
-/** A loose prop at the clips' scale: `width` in source pixels of the clips (halved art). */
+/** A loose prop at the clips' scale (and the characters' density): `width` in source pixels of the clips (halved art). */
 function buildProp(name, file, width, scale) {
-  const p = part(join(root, 'art', name), file, width * scale * 1.25);
+  const p = part(join(root, 'art', name), file, width * scale * CHARACTER_PX);
   const w = width * scale;
   const h = (w * p.h) / p.w;
   const svg = svgDoc(w, h, placeImage(p, w, 0, 0));
-  writeFileSync(join(out, `${name}-head.png`), render(svg, atScale));
+  writeFileSync(join(out, `${name}-head.png`), render(svg, atCharacterScale));
   console.log(`wrote public/sprites/hd/${name}-head.png`);
 }
 

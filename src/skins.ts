@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEFAULT_SKIN, PLAYER_SCALE, REG, RENDER_SCALE, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
+import { CHARACTER_PX, DEFAULT_SKIN, REG, SKINS, type SkinId, type SkinStats, type WeaponId } from './config';
 import { PLAYER_CLIPS, clipsEnd, createClipAnims, type Clip } from './clips';
 
 /**
@@ -10,15 +10,15 @@ import { PLAYER_CLIPS, clipsEnd, createClipAnims, type Clip } from './clips';
  *
  * The canvas is a grid of PLAYER_FRAME-sized frames at PLAYER_PX pixels per unit of the
  * 20x24 frame, and the player sprite is drawn at 1 / RENDER_SCALE, so he comes out
- * PLAYER_SCALE times as big as the frame (30x36 world units). A high-res skin (built by
+ * CHARACTER_SCALE times as big as the frame (30x36 world units). A high-res skin (built by
  * tools/art) is copied as it is. An old pixel-art skin (a strip of 20x24 frames from
  * tools/sprites.py) is scaled up frame by frame with crisp pixels.
  */
 const STORAGE_KEY = 'platformer.skin';
 /** One frame of an old pixel-art skin sheet. */
 const PIXEL_FRAME = { w: 20, h: 24 } as const;
-/** Pixels of the 'player' texture per unit of the 20x24 frame (the player is drawn PLAYER_SCALE times as big). */
-export const PLAYER_PX = RENDER_SCALE * PLAYER_SCALE;
+/** Pixels of the 'player' texture per unit of the 20x24 frame (the player is drawn CHARACTER_SCALE times as big). */
+export const PLAYER_PX = CHARACTER_PX;
 /** One frame of the 'player' texture, in high-res pixels. */
 export const PLAYER_FRAME = { w: PIXEL_FRAME.w * PLAYER_PX, h: PIXEL_FRAME.h * PLAYER_PX } as const;
 /** Frames per row in a high-res player sheet (and the 'player' texture): wide, so the sheet stays under 4096 px tall for phones. */
