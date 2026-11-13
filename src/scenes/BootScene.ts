@@ -26,15 +26,16 @@ export class BootScene extends Phaser.Scene {
     this.load.image('vampire-head', `hd/vampire-head.png${v}`);
     this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
-    this.load.image('machete', `machete.png${v}`);
+    // Pickups and shots are high-res: drawn at 1 / RENDER_SCALE.
+    this.load.image('machete', `hd/machete.png${v}`);
     this.load.spritesheet('ghost', `hd/ghost.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
-    this.load.spritesheet('gem', `gem.png${v}`, { frameWidth: 8, frameHeight: 8 });
-    this.load.image('key', `key.png${v}`);
-    this.load.image('jacket', `jacket.png${v}`);
-    this.load.image('gun', `gun.png${v}`);
-    this.load.image('bullet', `bullet.png${v}`);
-    this.load.image('shotgun', `shotgun.png${v}`);
-    this.load.image('salt', `salt.png${v}`);
+    this.load.spritesheet('gem', `hd/gem.png${v}`, { frameWidth: 8 * RENDER_SCALE, frameHeight: 8 * RENDER_SCALE });
+    this.load.image('key', `hd/key.png${v}`);
+    this.load.image('jacket', `hd/jacket.png${v}`);
+    this.load.image('gun', `hd/gun.png${v}`);
+    this.load.image('bullet', `hd/bullet.png${v}`);
+    this.load.image('shotgun', `hd/shotgun.png${v}`);
+    this.load.image('salt', `hd/salt.png${v}`);
     this.load.spritesheet('emote', `emote.png${v}`, { frameWidth: 7, frameHeight: 8 });
     for (const sheet of ['tiles', 'back', 'decor', 'candle']) {
       this.load.spritesheet(sheet, `${sheet}.png${v}`, { frameWidth: TILE, frameHeight: TILE });

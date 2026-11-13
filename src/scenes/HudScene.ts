@@ -41,7 +41,7 @@ export class HudScene extends Phaser.Scene {
     this.weaponMark = this.add.rectangle(0, 5, 0, 10).setStrokeStyle(1, 0xffffff, 0.6).setVisible(false);
     let right = HUD_WIDTH - 28;
     for (const id of (Object.keys(WEAPONS) as WeaponId[]).reverse()) {
-      const icon = this.add.image(right, 6, WEAPONS[id].icon).setOrigin(1, 0.5);
+      const icon = this.add.image(right, 6, WEAPONS[id].icon).setScale(1 / RENDER_SCALE).setOrigin(1, 0.5);
       right -= icon.displayWidth + 6;
       this.weaponIcons.set(id, icon);
     }
@@ -54,7 +54,7 @@ export class HudScene extends Phaser.Scene {
         pad.press('switch');
         pad.release('switch');
       });
-    this.keyIcon = this.add.image(HUD_WIDTH - 12, 5, 'key');
+    this.keyIcon = this.add.image(HUD_WIDTH - 12, 5, 'key').setScale(1 / RENDER_SCALE);
 
     this.message = this.add
       .text(HUD_WIDTH / 2, 70, '', { ...style, align: 'center', stroke: '#000000', strokeThickness: 3, lineSpacing: 4 })

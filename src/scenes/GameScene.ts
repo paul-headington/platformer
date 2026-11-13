@@ -300,24 +300,24 @@ export class GameScene extends Phaser.Scene {
         const bottom = (ty + 1) * TILE;
         if (ch in WEAPON_PICKUPS) {
           const weapon = WEAPON_PICKUPS[ch];
-          weaponPickups.push({ image: this.physics.add.staticImage(cx, cy + 4, WEAPONS[weapon].icon), weapon });
+          weaponPickups.push({ image: this.physics.add.staticImage(cx, cy + 4, WEAPONS[weapon].icon).setScale(1 / RENDER_SCALE).refreshBody(), weapon });
         }
         switch (ch) {
           case '*': {
-            const gem = gems.create(cx, cy, 'gem') as Sprite;
+            const gem = (gems.create(cx, cy, 'gem') as Sprite).setScale(1 / RENDER_SCALE).refreshBody();
             gem.play({ key: 'gem-sparkle', startFrame: tx % 4 });
             this.tweens.add({ targets: gem, y: cy - 2, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: tx * 40 });
             break;
           }
           case 'K':
-            key = this.physics.add.staticImage(cx, cy, 'key');
+            key = this.physics.add.staticImage(cx, cy, 'key').setScale(1 / RENDER_SCALE).refreshBody();
             this.tweens.add({ targets: key, y: cy - 3, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
             break;
           case 'J': {
             // Sits on the floor, with a slow bob and a faint glow so it reads as a pickup.
             const glow = this.add.image(cx, bottom - 6, 'glow-warm').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setDepth(-1);
             this.tweens.add({ targets: glow, alpha: 0.25, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-            const jacket = this.physics.add.staticImage(cx, bottom - 7, 'jacket').setData('glow', glow);
+            const jacket = this.physics.add.staticImage(cx, bottom - 7, 'jacket').setScale(1 / RENDER_SCALE).refreshBody().setData('glow', glow);
             this.tweens.add({ targets: jacket, y: bottom - 9, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
             jackets.push(jacket);
             break;
@@ -1090,7 +1090,7 @@ export class GameScene extends Phaser.Scene {
       // Pellets fan out evenly from the top of the spread to the bottom.
       const angle = weapon.pellets === 1 ? 0 : weapon.spread * (i / (weapon.pellets - 1) - 0.5);
       const rad = Phaser.Math.DegToRad(angle);
-      const b = this.bullets.create(x, y, weapon.bullet) as Sprite;
+      const b = (this.bullets.create(x, y, weapon.bullet) as Sprite).setScale(1 / RENDER_SCALE);
       b.setData({ weapon: id, fromX: x, fromY: y, passed: [] as Sprite[] });
       b.setVelocity(dir * weapon.speed * Math.cos(rad), weapon.speed * Math.sin(rad));
     }
@@ -1189,7 +1189,7 @@ export class GameScene extends Phaser.Scene {
       const back = (bullet.body as Body).velocity.x > 0 ? -1 : 1;
       const key = bullet.texture.key;
       bullet.destroy();
-      const grain = this.add.image(x, y, key).setDepth(9);
+      const grain = this.add.image(x, y, key).setScale(1 / RENDER_SCALE).setDepth(9);
       this.tweens.add({ targets: grain, x: x + back * Phaser.Math.Between(6, 14), y: y + 10, alpha: 0, angle: back * 90, duration: 300, ease: 'Quad.in', onComplete: () => grain.destroy() });
     }
 

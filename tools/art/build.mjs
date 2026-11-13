@@ -124,9 +124,25 @@ function buildProp(name, file, width, scale) {
   console.log(`wrote public/sprites/hd/${name}-head.png`);
 }
 
+/**
+ * Pickups and shots (art/pickups/, painted at 10 px per world unit): each scaled to the
+ * game's RENDER_SCALE px per unit, as public/sprites/hd/<texture key>.png.
+ */
+function buildPickups() {
+  const files = { gem: 'gem', key: 'key', gun: 'pistol', shotgun: 'shotgun', machete: 'machete', jacket: 'jacket', bullet: 'bullet', salt: 'salt' };
+  for (const [key, file] of Object.entries(files)) {
+    const png = readFileSync(join(root, 'art', 'pickups', `${file}.png`));
+    const [w, h] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+    const svg = svgDoc(w, h, `<image href="data:image/png;base64,${png.toString('base64')}" width="${w}" height="${h}" image-rendering="optimizeQuality"/>`);
+    writeFileSync(join(out, `${key}.png`), render(svg, { fitTo: { mode: 'zoom', value: RENDER_SCALE / 10 } }));
+  }
+  console.log(`wrote ${Object.keys(files).length} pickups to public/sprites/hd/`);
+}
+
 const ENEMIES = JSON.parse(readFileSync(join(root, 'src', 'clips.json'), 'utf8')).enemies;
 
 for (const [name, spec] of Object.entries(HOUSE)) buildTiles(name, spec);
+if (!onlyArg || 'pickups'.includes(onlyArg)) buildPickups();
 if (!onlyArg || 'zombie'.includes(onlyArg)) {
   // Zombie: cells 0-3 were the walk (3 is where it stands still); the head is about 0.3x.
   const scale = buildEnemy('zombie', ENEMIES.zombie, [0, 3, 6, 9]);
