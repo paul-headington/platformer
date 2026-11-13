@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { HUD_HEIGHT, HUD_SCALE, HUD_WIDTH, REG, RENDER_SCALE, TEXT_RES, SKINS, WEAPONS, type WeaponId, type WeaponStats } from '../config';
-import { currentSkin, faceCrop, nextSkin } from '../skins';
+import { PLAYER_PX, currentSkin, faceCrop, nextSkin } from '../skins';
 import { pad, type PadButton } from '../input/VirtualPad';
 import type { HudMessage } from './GameScene';
 import { goToMenu } from './MenuScene';
@@ -34,7 +34,7 @@ export class HudScene extends Phaser.Scene {
     this.livesText = this.add.text(124, 2, '', style);
     // The player's face beside LIVES: it shows the skin being worn, and clicking or tapping it
     // (or pressing K) changes skin. It is the head of the player's first frame, so it follows the skin.
-    this.face = this.add.image(0, 0, 'player', 0).setOrigin(0, 0).setScale(1 / RENDER_SCALE);
+    this.face = this.add.image(0, 0, 'player', 0).setOrigin(0, 0).setScale(1 / PLAYER_PX);
     this.showFace();
     this.add.zone(100, 0, 64, 14).setOrigin(0, 0).setInteractive().on('pointerdown', () => this.changeSkin());
     this.input.keyboard?.on('keydown-K', () => this.changeSkin());
@@ -110,7 +110,7 @@ export class HudScene extends Phaser.Scene {
   /** Crops the player texture to the worn skin's face, with its top-left corner at (108, 0). */
   private showFace(): void {
     const [x, y, w, h] = faceCrop(currentSkin(this));
-    this.face.setCrop(x, y, w, h).setPosition(108 - x / RENDER_SCALE, -y / RENDER_SCALE);
+    this.face.setCrop(x, y, w, h).setPosition(108 - x / PLAYER_PX, -y / PLAYER_PX);
   }
 
   private changeSkin(): void {

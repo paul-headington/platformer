@@ -18,8 +18,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ART = join(ROOT, 'art');
 /** Animation clips cut from AI videos, per character (shared with the game, see src/skins.ts). */
 const CLIPS = JSON.parse(readFileSync(join(ROOT, 'src', 'clips.json'), 'utf8')).players;
-/** Final pixels per design unit (RENDER_SCALE / 4, see build.mjs). */
-const PX = 1.25;
+/** Final pixels per design unit: RENDER_SCALE * PLAYER_SCALE / 4 (see build.mjs). */
+const PX = (5 * 1.5) / 4;
 const FACES = { smile: 'smile', open: 'open', o: 'o', grit: 'grit', smirk: 'smirk' };
 
 function character(c) {
@@ -132,8 +132,8 @@ function character(c) {
   }
 
   const clips = CLIPS[c.id];
-  const videoFrames = () => (clips ? clipSlots(dir, `${c.id}_clip_`, clips).slots : {});
-  return { name: c.sheet, frame: FRAME, columns: 10, count: clips ? clips.start + clipCount(clips) : 70, frames, draw, videoFrames, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
+  const videoFrames = () => (clips ? clipSlots(dir, `${c.id}_clip_`, clips, PX).slots : {});
+  return { name: c.sheet, frame: FRAME, zoom: PX, columns: 16, count: clips ? clips.start + clipCount(clips) : 70, frames, draw, videoFrames, available: existsSync(join(dir, `${c.id}_head_smile.png`)) };
 }
 
 const HUNTER = character({

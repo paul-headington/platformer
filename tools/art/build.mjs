@@ -44,7 +44,8 @@ function buildSheet(s) {
   }).join('');
   const svg = svgDoc(s.columns * w, rows * h, body);
   if (keepSvg) writeFileSync(join(out, `${s.name}.svg`), svg);
-  writeFileSync(join(out, `${s.name}.png`), render(svg, atScale));
+  // Player sheets are drawn bigger (PLAYER_SCALE in src/config.ts), so they set their own zoom.
+  writeFileSync(join(out, `${s.name}.png`), render(svg, s.zoom ? { fitTo: { mode: 'zoom', value: s.zoom } } : atScale));
   console.log(`wrote public/sprites/hd/${s.name}.png (${poses.filter(Boolean).length} rigged, ${Object.keys(video).length} video frames)`);
   return poses;
 }

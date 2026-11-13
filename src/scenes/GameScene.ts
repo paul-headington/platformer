@@ -11,6 +11,7 @@ import {
   GAME_HEIGHT,
   GAME_WIDTH,
   PLAYER,
+  PLAYER_SCALE,
   REG,
   RENDER_SCALE,
   SCORE,
@@ -27,7 +28,7 @@ import {
   type WeaponStats,
 } from '../config';
 import { pad } from '../input/VirtualPad';
-import { playerAnim, playerClip } from '../skins';
+import { PLAYER_PX, playerAnim, playerClip } from '../skins';
 import type { Clip } from '../clips';
 import { LEVEL_1, type BackStyle, type Level } from '../levels/level1';
 
@@ -333,7 +334,7 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case 'P':
-            this.spawn.set(cx, bottom - 12);
+            this.spawn.set(cx, bottom - 12 * PLAYER_SCALE);
             break;
           case 'B':
             this.addLooseBook(tx, ty);
@@ -362,10 +363,12 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    // The 'player' texture is high-res (RENDER_SCALE pixels per unit), so the sprite is
-    // scaled down, and its body is sized in the texture's pixels: 8x22 units, 6 in and 2 down.
+    // The 'player' texture is high-res (PLAYER_PX pixels per unit of the 20x24 frame) and the
+    // sprite is drawn at 1 / RENDER_SCALE, so he is PLAYER_SCALE times the frame. His body is
+    // sized in the texture's pixels: 8x20 units of the frame, 6 in and 4 down (12x30 in the
+    // world). That leaves the top of his hair out, so he still fits under a ceiling two tiles up.
     this.player = this.physics.add.sprite(this.spawn.x, this.spawn.y, 'player', 0).setScale(1 / RENDER_SCALE);
-    (this.player.body as Body).setSize(8 * RENDER_SCALE, 22 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 2 * RENDER_SCALE);
+    (this.player.body as Body).setSize(8 * PLAYER_PX, 20 * PLAYER_PX).setOffset(6 * PLAYER_PX, 4 * PLAYER_PX);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
     const world: ZombieWorld = (this.world = {
@@ -1088,8 +1091,8 @@ export class GameScene extends Phaser.Scene {
     this.lastShotAt = time;
     this.fired = true;
     const dir = this.player.flipX ? -1 : 1;
-    const x = this.player.x + dir * 10;
-    const y = this.player.y + 1;
+    const x = this.player.x + dir * 10 * PLAYER_SCALE;
+    const y = this.player.y + PLAYER_SCALE;
     for (let i = 0; i < weapon.pellets; i++) {
       // Pellets fan out evenly from the top of the spread to the bottom.
       const angle = weapon.pellets === 1 ? 0 : weapon.spread * (i / (weapon.pellets - 1) - 0.5);
@@ -1121,8 +1124,8 @@ export class GameScene extends Phaser.Scene {
       const front = dir > 0 ? body.right : body.left;
       const hitbox = new Phaser.Geom.Rectangle(Math.min(front, front + dir * blade.reach), body.top - 4, blade.reach, body.height + 4);
 
-      const slash = this.add.image(front + dir * 6, p.y, 'slash').setFlipX(dir < 0).setDepth(11).setAlpha(0.9);
-      this.tweens.add({ targets: slash, alpha: 0, x: slash.x + dir * 4, scaleY: 1.15, duration: 160, onComplete: () => slash.destroy() });
+      const slash = this.add.image(front + dir * 6 * PLAYER_SCALE, p.y, 'slash').setScale(PLAYER_SCALE).setFlipX(dir < 0).setDepth(11).setAlpha(0.9);
+      this.tweens.add({ targets: slash, alpha: 0, x: slash.x + dir * 4 * PLAYER_SCALE, scaleY: 1.15 * PLAYER_SCALE, duration: 160, onComplete: () => slash.destroy() });
 
       for (const group of this.enemyGroups()) {
         for (const enemy of [...group.getChildren()] as Sprite[]) {
