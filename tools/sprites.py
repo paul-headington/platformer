@@ -495,10 +495,116 @@ WEAVER = {
     'EXTRA_BACK': [(SPIDER, 2, 8)],
 }
 
+# ---- Ink: silver hair in a messy high ponytail, round glasses, a cross earring,
+# an oversized black tee and dark shorts, with grey ink tattoos and red roses
+# all down her arms and legs.
+INK_PALETTE = {
+    **PALETTE,
+    's': (240, 226, 222),  # pale skin
+    'S': (196, 176, 182),  # skin shade
+    'z': (214, 218, 232),  # silver-white hair
+    'Z': (156, 162, 190),  # hair shade
+    'j': (222, 206, 208),  # tattooed arm: skin...
+    'J': (120, 116, 134),  # ...and grey ink
+    'p': (222, 206, 208),  # tattooed leg: skin...
+    'P': (120, 116, 134),  # ...and grey ink
+    'r': (204, 38, 50),    # red roses in the tattoos
+    'L': (40, 36, 50),     # oversized black tee
+    'h': (26, 24, 34),     # tee shade
+    'd': (64, 62, 78),     # dark shorts
+    'D': (40, 38, 52),     # shorts shade
+    'b': (36, 32, 44),     # black boots
+    'M': (120, 124, 140),  # glasses frames (and gun metal shade)
+    'i': (146, 146, 166),  # ear piercings and the little cross earring
+}
+
+INK_HEAD = """
+............
+...kkkkkk...
+..kzzzzzzkk.
+.kzzzzzzzzzk
+.kzzzzzzzzzk
+.kzZzzzZzkzk
+.kzzzsSsMssk
+.kzZiMMMkMsk
+.kzzisSsMsk.
+.kZkiSSSSk..
+.kzk.kkkk...
+.kzk........
+..k.........
+"""
+
+INK_HEAD_BACK = """
+............
+...kkkkkk...
+..kzzzzzzk..
+.kzzzZZzzzk.
+.kzzzZZzzzk.
+.kzzzzzzzzk.
+.kzZzzzzZzk.
+.kzzzzzzzzk.
+.kZzzzzzzZk.
+..kzzzzzzk..
+...kkzzkk...
+....kzzk....
+....kZzk....
+.....kk.....
+"""
+
+# The high ponytail, flicking up and back from the crown.
+PONYTAIL = """
+.kkkk...
+kzzzzkk.
+kzZkk...
+kzzk....
+kzZk....
+.kzk....
+.kzk....
+..k.....
+"""
+
+
+def tee(body):
+    """Re-dresses one of the hunter's torsos in a baggy black tee whose sleeves
+    reach the elbow; the rest of each arm is tattooed skin with a rose."""
+    rows = [list(r) for r in body.strip('\n').split('\n')]
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in 'jJfFl' and 2 <= x <= 11:
+                row[x] = 'h' if ch == 'J' else 'L'
+            elif ch == 'j' and (x + y) % 3 == 0:
+                row[x] = 'J'
+    return '\n'.join(''.join(r) for r in rows)
+
+
+def shorts(legs):
+    """The hunter's jeans cut off as shorts: tattooed legs below, a rose on one shin."""
+    rows = [list(r) for r in legs.strip('\n').split('\n')]
+    rose = False
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch not in 'pP':
+                continue
+            if y <= 1:
+                row[x] = 'D' if ch == 'P' else 'd'
+            elif ch == 'p' and y >= 3 and not rose:
+                row[x], rose = 'r', True
+    return '\n'.join(''.join(r) for r in rows)
+
+
+INK = {
+    'HEAD': INK_HEAD, 'HEAD_BACK': INK_HEAD_BACK,
+    **{k: tee(HUNTER[k]) for k in HUNTER if k.startswith('BODY_')},
+    **{k: shorts(HUNTER[k]) for k in HUNTER if k.startswith('LEGS_')},
+    'EXTRA': [(PONYTAIL, 2, 1)],
+    'EXTRA_BACK': [],
+}
+
 # Each skin's sheet, built with its palette. The game picks one (SKINS in src/config.ts).
 PLAYER_SKINS = {
     'player': (PLAYER, PALETTE),
     'player-weaver': (player_frames(WEAVER), WEAVER_PALETTE),
+    'player-ink': (player_frames(INK), INK_PALETTE),
 }
 
 ZOMBIE_HEAD = """
