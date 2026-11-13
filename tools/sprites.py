@@ -4,6 +4,8 @@ Builds the game's sprite sheets from the ASCII pixel maps below.
     python3 tools/sprites.py            # writes public/sprites/*.png
     python3 tools/sprites.py --preview  # also writes docs/sprite-preview.png (8x zoom)
 
+Player skins (PLAYER_SKINS) each get a whole sheet, player-<skin>.png, with its own palette.
+
 Each character in a map is one pixel; '.' is transparent. Colours come from
 PALETTE. Frames of one sheet sit side by side, left to right, so frame N in
 Phaser is the Nth map in the list. Edit a map, re-run, refresh the game.
@@ -267,57 +269,6 @@ def mirror(part):
     return '\n'.join(row[::-1] for row in part.strip('\n').split('\n'))
 
 
-def climb_pose(flip):
-    body, legs = (mirror(BODY_CLIMB), mirror(LEGS_CLIMB)) if flip else (BODY_CLIMB, LEGS_CLIMB)
-    return [(legs, 3, 17), (body, 3, 10), (HEAD_BACK, 4, 0)]
-
-
-def pose(head_dy, body, legs, legs_dy=0):
-    return [(legs, 3, 17 + legs_dy), (body, 3, 10 + head_dy), (HEAD, 5, head_dy)]
-
-
-def gun_pose(head_dy, body, legs, gun=None):
-    held = (GUN_IN_HAND, 13, 11 + head_dy) if gun is None else (gun, 8, 11 + head_dy)
-    return pose(head_dy, body, legs) + [held]
-
-
-def shotgun_pose(head_dy, body, legs):
-    return gun_pose(head_dy, body, legs, SHOTGUN_IN_HAND)
-
-
-# Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb,
-# then the same idle/run/jump/fall poses holding the gun: 10-11 idle, 12-15 run,
-# 16 jump, 17 fall; and again holding the rock salt shotgun: 18-19 idle, 20-23 run,
-# 24 jump, 25 fall.
-PLAYER = [
-    pose(0, BODY_IDLE, LEGS_STAND),
-    pose(1, BODY_IDLE, LEGS_STAND),
-    pose(1, BODY_RUN_A, LEGS_STRIDE),
-    pose(0, BODY_IDLE, LEGS_PASS),
-    pose(1, BODY_RUN_B, LEGS_STRIDE),
-    pose(0, BODY_IDLE, LEGS_PASS),
-    pose(0, BODY_JUMP, LEGS_TUCK),
-    pose(0, BODY_ARMS_UP, LEGS_DANGLE),
-    climb_pose(False),
-    climb_pose(True),
-    gun_pose(0, BODY_AIM, LEGS_STAND),
-    gun_pose(1, BODY_AIM, LEGS_STAND),
-    gun_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
-    gun_pose(0, BODY_AIM, LEGS_PASS),
-    gun_pose(1, BODY_AIM, LEGS_STRIDE),
-    gun_pose(0, BODY_AIM, LEGS_PASS),
-    gun_pose(0, BODY_AIM, LEGS_TUCK),
-    gun_pose(0, BODY_AIM, LEGS_DANGLE),
-    shotgun_pose(0, BODY_AIM, LEGS_STAND),
-    shotgun_pose(1, BODY_AIM, LEGS_STAND),
-    shotgun_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
-    shotgun_pose(0, BODY_AIM, LEGS_PASS),
-    shotgun_pose(1, BODY_AIM, LEGS_STRIDE),
-    shotgun_pose(0, BODY_AIM, LEGS_PASS),
-    shotgun_pose(0, BODY_AIM, LEGS_TUCK),
-    shotgun_pose(0, BODY_AIM, LEGS_DANGLE),
-]
-
 # The machete, held up and ready beside the face: the grip is in the same hand
 # as the guns', with the blade standing straight up. Stamped at x=13, y=3.
 MACHETE_IN_HAND = """
@@ -360,24 +311,195 @@ kkkkkmMk
 ......kk.
 """
 
+# ---------------------------------------------------------------- player skins
+# Every skin has the same 36 frames in the same order, so the game can swap one
+# sheet for another. A skin names the parts it redraws (anything it leaves out
+# is the ghost hunter's) and the colours it changes. The held weapons use 'j'
+# and 'J' for the sleeve and 's' for the hand, so they take on each skin's colours.
+#   EXTRA:      parts stamped on top of the standing poses, as (art, x, y), moving with the head
+#   EXTRA_BACK: the same for the climbing poses (seen from behind)
+HUNTER = {
+    'HEAD': HEAD, 'HEAD_BACK': HEAD_BACK,
+    'BODY_IDLE': BODY_IDLE, 'BODY_RUN_A': BODY_RUN_A, 'BODY_RUN_B': BODY_RUN_B,
+    'BODY_JUMP': BODY_JUMP, 'BODY_ARMS_UP': BODY_ARMS_UP, 'BODY_CLIMB': BODY_CLIMB,
+    'BODY_AIM': BODY_AIM, 'BODY_AIM_RUN': BODY_AIM_RUN,
+    'LEGS_STAND': LEGS_STAND, 'LEGS_STRIDE': LEGS_STRIDE, 'LEGS_PASS': LEGS_PASS,
+    'LEGS_TUCK': LEGS_TUCK, 'LEGS_DANGLE': LEGS_DANGLE, 'LEGS_CLIMB': LEGS_CLIMB,
+    'EXTRA': [], 'EXTRA_BACK': [],
+}
 
-def machete_pose(head_dy, body, legs):
-    return pose(head_dy, body, legs) + [(MACHETE_IN_HAND, 13, 3 + head_dy)]
+
+def player_frames(skin: dict) -> list:
+    g = {**HUNTER, **skin}
+
+    def extra(key, dy):
+        return [(art, x, y + dy) for art, x, y in g[key]]
+
+    def pose(head_dy, body, legs, legs_dy=0):
+        return [(g[legs], 3, 17 + legs_dy), (g[body], 3, 10 + head_dy), (g['HEAD'], 5, head_dy)] + extra('EXTRA', head_dy)
+
+    def climb_pose(flip):
+        body, legs = g['BODY_CLIMB'], g['LEGS_CLIMB']
+        if flip:
+            body, legs = mirror(body), mirror(legs)
+        return [(legs, 3, 17), (body, 3, 10), (g['HEAD_BACK'], 4, 0)] + extra('EXTRA_BACK', 0)
+
+    def holding(item, x, y):
+        return lambda head_dy, body, legs: pose(head_dy, body, legs) + [(item, x, y + head_dy)]
+
+    # Frames: 0-1 idle (breathe), 2-5 run, 6 jump, 7 fall / hurt, 8-9 climb.
+    frames = [
+        pose(0, 'BODY_IDLE', 'LEGS_STAND'),
+        pose(1, 'BODY_IDLE', 'LEGS_STAND'),
+        pose(1, 'BODY_RUN_A', 'LEGS_STRIDE'),
+        pose(0, 'BODY_IDLE', 'LEGS_PASS'),
+        pose(1, 'BODY_RUN_B', 'LEGS_STRIDE'),
+        pose(0, 'BODY_IDLE', 'LEGS_PASS'),
+        pose(0, 'BODY_JUMP', 'LEGS_TUCK'),
+        pose(0, 'BODY_ARMS_UP', 'LEGS_DANGLE'),
+        climb_pose(False),
+        climb_pose(True),
+    ]
+    # Then the same idle/run/jump/fall poses holding each weapon: 10-17 the pistol
+    # (GUN_IN_HAND sits level with the bullet's spawn point), 18-25 the rock salt
+    # shotgun (stamped at x=8 so the hand is where the pistol's is), 26-33 the machete.
+    for held in (holding(GUN_IN_HAND, 13, 11), holding(SHOTGUN_IN_HAND, 8, 11), holding(MACHETE_IN_HAND, 13, 3)):
+        frames += [
+            held(0, 'BODY_AIM', 'LEGS_STAND'),
+            held(1, 'BODY_AIM', 'LEGS_STAND'),
+            held(1, 'BODY_AIM_RUN', 'LEGS_STRIDE'),
+            held(0, 'BODY_AIM', 'LEGS_PASS'),
+            held(1, 'BODY_AIM', 'LEGS_STRIDE'),
+            held(0, 'BODY_AIM', 'LEGS_PASS'),
+            held(0, 'BODY_AIM', 'LEGS_TUCK'),
+            held(0, 'BODY_AIM', 'LEGS_DANGLE'),
+        ]
+    # 34-35 a machete swing (raise, strike).
+    frames += [
+        pose(0, 'BODY_JUMP', 'LEGS_STAND') + [(MACHETE_RAISED, 13, 3)],
+        pose(1, 'BODY_AIM', 'LEGS_STRIDE') + [(MACHETE_STRIKE, 13, 12)],
+    ]
+    return frames
 
 
-# 26-27 idle, 28-31 run, 32 jump, 33 fall holding the machete; 34-35 a swing (raise, strike).
-PLAYER += [
-    machete_pose(0, BODY_AIM, LEGS_STAND),
-    machete_pose(1, BODY_AIM, LEGS_STAND),
-    machete_pose(1, BODY_AIM_RUN, LEGS_STRIDE),
-    machete_pose(0, BODY_AIM, LEGS_PASS),
-    machete_pose(1, BODY_AIM, LEGS_STRIDE),
-    machete_pose(0, BODY_AIM, LEGS_PASS),
-    machete_pose(0, BODY_AIM, LEGS_TUCK),
-    machete_pose(0, BODY_AIM, LEGS_DANGLE),
-    pose(0, BODY_JUMP, LEGS_STAND) + [(MACHETE_RAISED, 13, 3)],
-    pose(1, BODY_AIM, LEGS_STRIDE) + [(MACHETE_STRIKE, 13, 12)],
-]
+PLAYER = player_frames(HUNTER)
+
+
+# ---- The Weaver: a pale goth spirit in a dark teal kimono with red flowers and a
+# red obi, waist-long straight black hair with blunt bangs, dark lips, a red streak
+# under the eye, and a red-eyed spider riding on her shoulder.
+WEAVER_PALETTE = {
+    **PALETTE,
+    's': (238, 230, 236),  # pale skin
+    'S': (192, 176, 198),  # skin shade
+    'z': (44, 38, 60),     # black hair
+    'Z': (74, 68, 100),    # hair sheen
+    'j': (46, 82, 88),     # dark teal kimono
+    'J': (28, 52, 60),     # kimono shade
+    'l': (234, 214, 180),  # cream collar and flower petals
+    'f': (186, 44, 46),    # red obi
+    'F': (118, 28, 36),    # obi shade, and the red streak under her eye
+    'c': (218, 74, 60),    # red flowers on the kimono
+    'p': (46, 82, 88),     # kimono skirt
+    'P': (28, 52, 60),
+    'b': (222, 214, 210),  # white tabi socks
+    'u': (66, 20, 44),     # dark lipstick
+    'r': (226, 40, 52),    # the spider's red eyes
+    'H': (104, 70, 56),    # the spider's brown body
+}
+
+WEAVER_HEAD = """
+............
+...kkkkkk...
+..kzzzzzzkk.
+.kzzZZZZzzzk
+.kzzzzzzzzzk
+.kzzzzzzzzzk
+.kzzzSsSkssk
+.kzzzSssFssk
+.kzzzsssFuk.
+.kzzzkSSSk..
+.kzzzk......
+.kzzzk......
+.kzzzk......
+.kzzzk......
+.kzzk.......
+..kk........
+"""
+
+WEAVER_HEAD_BACK = """
+............
+...kkkkkk...
+..kzzzzzzk..
+.kzZZZZZzzk.
+.kzzzzzzzzk.
+.kzzzzzzzzk.
+.kzzzzzzzzk.
+.kzzzzzzzzk.
+.kzzzzzzzzk.
+.kzzzzzzzzk.
+..kzzzzzzk..
+..kzzzzzzk..
+..kzzzzzzk..
+..kzzzzzzk..
+..kzzzzzzk..
+...kkkkkk...
+"""
+
+# A small black spider with red eyes, riding on her back shoulder.
+SPIDER = """
+k..kk.k
+.kkHHkk
+kkHHHrk
+.kkHHkk
+k.k..k.
+"""
+
+
+def kimono(body):
+    """Re-dresses one of the hunter's torsos as the kimono: cream collar, red obi
+    round the waist, red flowers; the sleeves keep their shape in teal."""
+    rows = [list(r) for r in body.strip('\n').split('\n')]
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch not in 'jJfFl' or not 3 <= x <= 10:
+                continue
+            if y == 1:
+                row[x] = 'l' if ch in 'fFl' else ch
+            elif y == 2:
+                row[x] = 'l' if x == 7 else ('c' if x == 4 else ('J' if ch == 'J' else 'j'))
+            elif y in (3, 4):
+                row[x] = 'J' if x == 3 else ('l' if (x, y) == (8, 4) else ('F' if y == 4 else 'f'))
+            elif y == 5:
+                row[x] = 'c' if x == 7 else ('J' if ch == 'J' else 'j')
+    return '\n'.join(''.join(r) for r in rows)
+
+
+# The robe falls to the ankles when she stands; walking and jumping show the hem
+# parting over white tabi socks.
+WEAVER_LEGS_STAND = """
+...kjjjjjjk...
+...kJjjcjjk...
+...kJjjjjjk...
+...kJjcjjjjk..
+...kJjjjjjjk..
+...kkbbkkbbk..
+...kkkkkkkkk..
+"""
+
+WEAVER = {
+    'HEAD': WEAVER_HEAD, 'HEAD_BACK': WEAVER_HEAD_BACK,
+    **{k: kimono(HUNTER[k]) for k in HUNTER if k.startswith('BODY_')},
+    'LEGS_STAND': WEAVER_LEGS_STAND,
+    'EXTRA': [(SPIDER, 2, 7)],
+    'EXTRA_BACK': [(SPIDER, 2, 8)],
+}
+
+# Each skin's sheet, built with its palette. The game picks one (SKINS in src/config.ts).
+PLAYER_SKINS = {
+    'player': (PLAYER, PALETTE),
+    'player-weaver': (player_frames(WEAVER), WEAVER_PALETTE),
+}
 
 ZOMBIE_HEAD = """
 ..knkkkkk...
@@ -1759,7 +1881,7 @@ def build_tiles(frames) -> Image.Image:
 
 
 SHEETS = {
-    'player': PLAYER, 'zombie': ZOMBIE, 'ghost': GHOST,
+    'zombie': ZOMBIE, 'ghost': GHOST,
     'gem': GEM, 'key': KEY, 'gun': GUN, 'bullet': BULLET,
     'shotgun': SHOTGUN, 'salt': SALT, 'emote': EMOTE,
     'vampire': VAMPIRE, 'vampire-head': VAMPIRE_HEAD, 'machete': MACHETE,
@@ -1783,7 +1905,8 @@ if __name__ == '__main__':
     root = Path(__file__).resolve().parent.parent
     out_dir = root / 'public' / 'sprites'
     out_dir.mkdir(parents=True, exist_ok=True)
-    built = {name: build(frames, size=CHAR_SIZE.get(name)) for name, frames in SHEETS.items()}
+    built = {name: build(frames, pal, size=CHAR_SIZE['player']) for name, (frames, pal) in PLAYER_SKINS.items()}
+    built.update({name: build(frames, size=CHAR_SIZE.get(name)) for name, frames in SHEETS.items()})
     built.update({name: build_tiles(frames) for name, frames in TILE_SHEETS.items()})
     built['sky'] = sky_art()
     for name, im in built.items():
