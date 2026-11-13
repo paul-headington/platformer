@@ -143,6 +143,11 @@ function character(c) {
   function clipFrames() {
     const spec = CLIPS[c.id];
     if (!spec) return {};
+    // Keeps each frame inside its cell: what reaches past the sides (a muzzle blast) fades out.
+    const e = 5 / FRAME.w;
+    const fadeEdges =
+      `<defs><linearGradient id="clipfadeg"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="${e}" stop-color="#fff"/><stop offset="${1 - e}" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>` +
+      `<mask id="clipfade" maskUnits="userSpaceOnUse" x="0" y="0" width="${FRAME.w}" height="${FRAME.h}"><rect width="${FRAME.w}" height="${FRAME.h}" fill="url(#clipfadeg)"/></mask></defs>`;
     const measure = (file, count) => stripFrames(dir, `${c.id}_clip_${file}`, count);
     const idle = spec.clips.find((k) => k.name === 'idle');
     const ref = measure(idle.file, idle.strip);
@@ -155,13 +160,15 @@ function character(c) {
       const [fw, fh] = [m.fw * scale, m.fh * scale];
       const sheet = part(dir, `${c.id}_clip_${k.file}`, fw * k.strip * PX);
       const sx = sheet.w / k.strip; // one frame's width in the (maybe shrunk) picture
-      const x = FRAME.w / 2 + 1 - m.legsX * scale;
+      // Centred on the legs, or (a death, lying flat) on everything drawn.
+      const x = FRAME.w / 2 + 1 - (k.centre === 'all' ? (m.all.x0 + m.all.x1) / 2 : m.legsX) * scale;
       for (const i of k.frames ?? [...Array(k.strip).keys()]) {
         const bottom = k.anchor === 'feet' ? m.boxes[i].y1 : m.all.y1;
         const y = GROUND - bottom * scale;
         slots[slot++] =
-          `<svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${i * sx} 0 ${sx} ${sheet.h}" preserveAspectRatio="none" overflow="hidden">` +
-          `<image href="${sheet.href}" width="${sheet.w}" height="${sheet.h}" image-rendering="optimizeQuality"/></svg>`;
+          (slot === CLIP_START ? fadeEdges : "") +
+          `<g mask="url(#clipfade)"><svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${i * sx} 0 ${sx} ${sheet.h}" preserveAspectRatio="none" overflow="hidden">` +
+          `<image href="${sheet.href}" width="${sheet.w}" height="${sheet.h}" image-rendering="optimizeQuality"/></svg></g>`;
       }
     }
     return slots;

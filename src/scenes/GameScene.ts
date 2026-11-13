@@ -183,9 +183,11 @@ export class GameScene extends Phaser.Scene {
   private lastShotAt = -Infinity;
   /** The swing in progress, if any: when it started and when it ends. */
   private swingStartedAt = -Infinity;
-  /** Landing: the player was in the air last frame, and the landing clip plays until landUntil. */
+  /** Landing: the player was in the air last frame, and has just come down. */
   private wasAirborne = false;
-  private landUntil = -Infinity;
+  private landed = false;
+  /** A shot was fired since the last frame: its clip starts (when standing). */
+  private fired = false;
   private swingUntil = -Infinity;
   private invulnerableUntil = 0;
   private lockedHintAt = -Infinity;
@@ -926,11 +928,15 @@ export class GameScene extends Phaser.Scene {
     if (jumpReleased && body.velocity.y < 0) body.velocity.y *= 0.45;
 
     const held = this.heldWeapon();
-    // A skin with video clips has its own jump, fall and landing, when empty-handed.
+    // A skin with video clips has its own jump, fall and landing (the same with or without
+    // a weapon), armed idles, and a clip for each gun firing.
     const rise = body.velocity.y < 0;
-    const airClip = !held && playerClip(this, rise ? 'jump' : 'fall');
-    const land = !held && playerClip(this, 'land');
-    if (onGround && this.wasAirborne && land) this.landUntil = time + (land.frames.length / land.fps) * 1000;
+    const airClip = playerClip(this, rise ? 'jump' : 'fall');
+    const land = playerClip(this, 'land') && playerAnim(this, 'player-land');
+    const fireAnim = held && playerClip(this, `fire-${held}`) && playerAnim(this, `player-fire-${held}`);
+    /** True while a once-through animation is still going. */
+    const going = (key: string) => p.anims.currentAnim?.key === key && p.anims.isPlaying;
+    if (onGround && this.wasAirborne && land) this.landed = true;
     this.wasAirborne = !onGround;
     if (time < this.swingUntil) {
       p.anims.stop();
@@ -945,11 +951,16 @@ export class GameScene extends Phaser.Scene {
       p.setFrame((rise ? PLAYER_FRAME.jump : PLAYER_FRAME.fall) + (held ? PLAYER_HOLDING[held] : 0));
     } else if (body.velocity.x !== 0) {
       p.anims.play(playerAnim(this, held ? `player-run-${held}` : 'player-run'), true);
-    } else if (land && time < this.landUntil) {
-      playOnce(p, playerAnim(this, 'player-land'));
+    } else if (fireAnim && this.fired) {
+      p.anims.play(fireAnim); // from the start, even mid-way through the last shot's clip
+    } else if (fireAnim && going(fireAnim)) {
+      // Let the shot's clip finish.
+    } else if (land && (this.landed || going(land))) {
+      playOnce(p, land);
     } else {
       p.anims.play(playerAnim(this, held ? `player-idle-${held}` : 'player-idle'), true);
     }
+    this.fired = this.landed = false;
   }
 
   // ---------------------------------------------------------------- ladders
@@ -1060,6 +1071,7 @@ export class GameScene extends Phaser.Scene {
     const live = (this.bullets.getChildren() as Sprite[]).filter((b) => b.getData('weapon') === id).length;
     if (live >= weapon.maxOnScreen * weapon.pellets) return;
     this.lastShotAt = time;
+    this.fired = true;
     const dir = this.player.flipX ? -1 : 1;
     const x = this.player.x + dir * 10;
     const y = this.player.y + 1;
@@ -1348,8 +1360,17 @@ export class GameScene extends Phaser.Scene {
     if (!force && this.time.now < this.invulnerableUntil) return;
 
     const lives = this.loseLife(damage);
-    this.player.anims.stop();
-    this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
+    // A skin with video clips flinches, or on the last life falls down dead where it stands.
+    const clip = lives > 0 ? 'hurt' : 'death';
+    if (playerClip(this, clip)) {
+      this.player.anims.play(playerAnim(this, `player-${clip}`));
+      this.player.setTint(0xff9a9a);
+      if (lives > 0) this.player.setVelocity(0, -220);
+      else (this.player.body as Body).moves = false;
+    } else {
+      this.player.anims.stop();
+      this.player.setFrame(PLAYER_FRAME.hurt).setTint(0xff4040).setVelocity(0, -220);
+    }
     this.cameras.main.shake(150, 0.01);
 
     this.time.delayedCall(1000, () => (lives > 0 ? this.respawn() : this.gameOver()));
@@ -1373,7 +1394,8 @@ export class GameScene extends Phaser.Scene {
   private gameOver(): void {
     this.state = 'over';
     pad.clearPresses();
-    this.player.setVisible(false);
+    // He lies where he fell when the skin has a death clip; otherwise he has dropped off screen.
+    if (!playerClip(this, 'death')) this.player.setVisible(false);
     this.say(`GAME OVER\n${this.isTouch() ? 'Tap' : 'Press Enter'} to try again`, true);
   }
 

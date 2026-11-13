@@ -10,7 +10,13 @@
       {"name": "climb", "file": "climb", "strip": 16, "fps": 10, "anchor": "strip"},
       {"name": "run-pistol", "file": "run_pistol", "strip": 11, "fps": 22, "anchor": "strip"},
       {"name": "run-shotgun", "file": "run_shotgun", "strip": 8, "fps": 16, "anchor": "strip"},
-      {"name": "swing", "file": "machete_swing", "strip": 14, "fps": 16, "anchor": "strip", "once": true, "hitFrame": 7}
+      {"name": "swing", "file": "machete_swing", "strip": 14, "fps": 16, "anchor": "strip", "once": true, "hitFrame": 7},
+      {"name": "idle-pistol", "file": "idle_pistol", "strip": 8, "fps": 6, "anchor": "strip"},
+      {"name": "fire-pistol", "file": "fire_pistol", "strip": 10, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "idle-shotgun", "file": "idle_shotgun", "strip": 10, "fps": 6, "anchor": "strip"},
+      {"name": "fire-shotgun", "file": "fire_shotgun", "strip": 13, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "hurt", "file": "hurt", "strip": 9, "fps": 16, "anchor": "strip", "once": true},
+      {"name": "death", "file": "death", "strip": 11, "fps": 12, "anchor": "strip", "once": true, "centre": "all"}
     ]
   }
 }
