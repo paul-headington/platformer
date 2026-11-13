@@ -33,7 +33,10 @@ export function clipSlots(dir, prefix, spec) {
   // For "video" clips: the middle of the first clip's drawing, in pixels of the source video
   // (halved, like the art), which goes in the middle of the cell.
   const origin = (k) => (k.origin ?? [0, 0]).map((v) => v / 2);
-  const mid = [origin(spec.clips[0])[0] + (ref.all.x0 + ref.all.x1) / 2, origin(spec.clips[0])[1] + (ref.all.y0 + ref.all.y1) / 2];
+  // With `ground` (a character that stands), the first clip's feet go on the ground instead.
+  const o0 = origin(spec.clips[0]);
+  const mid = [o0[0] + (ref.all.x0 + ref.all.x1) / 2, o0[1] + (spec.ground ? ref.all.y1 : (ref.all.y0 + ref.all.y1) / 2)];
+  const midY = spec.ground ? GROUND : FRAME.h / 2;
   const slots = {};
   let slot = spec.start;
   for (const k of spec.clips) {
@@ -49,7 +52,7 @@ export function clipSlots(dir, prefix, spec) {
       : FRAME.w / 2 + 1 - (k.centre === 'all' ? (m.all.x0 + m.all.x1) / 2 : m.legsX) * scale;
     for (const i of k.frames ?? [...Array(k.strip).keys()]) {
       const bottom = k.anchor === 'feet' ? m.boxes[i].y1 : m.all.y1;
-      const y = video ? FRAME.h / 2 + (origin(k)[1] - mid[1]) * scale : GROUND - bottom * scale;
+      const y = video ? midY + (origin(k)[1] - mid[1]) * scale : GROUND - bottom * scale;
       slots[slot] =
         (slot === spec.start ? fadeEdges : '') +
         `<g mask="url(#clipfade)"><svg x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${fw.toFixed(2)}" height="${fh.toFixed(2)}" viewBox="${(i % m.columns) * sx} ${Math.floor(i / m.columns) * sy} ${sx} ${sy}" preserveAspectRatio="none" overflow="hidden">` +

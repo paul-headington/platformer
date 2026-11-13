@@ -22,8 +22,8 @@ export class BootScene extends Phaser.Scene {
     loadSkins(this.load, v);
     // High-res, like the player: cells of 20x24 units at RENDER_SCALE (see tools/art).
     this.load.spritesheet('zombie', `hd/zombie.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
-    this.load.spritesheet('vampire', `vampire.png${v}`, { frameWidth: 20, frameHeight: 24 });
-    this.load.image('vampire-head', `vampire-head.png${v}`);
+    this.load.spritesheet('vampire', `hd/vampire.png${v}`, { frameWidth: 20 * RENDER_SCALE, frameHeight: 24 * RENDER_SCALE });
+    this.load.image('vampire-head', `hd/vampire-head.png${v}`);
     this.load.image('zombie-head', `hd/zombie-head.png${v}`);
     this.load.spritesheet('gore', `gore.png${v}`, { frameWidth: 4, frameHeight: 4 });
     this.load.image('machete', `machete.png${v}`);
@@ -75,12 +75,13 @@ export class BootScene extends Phaser.Scene {
       return this.anims.generateFrameNumbers(key, { frames: have.length > 0 ? have : [0] });
     };
     createPlayerAnims(this, PLAYER_HOLDING);
-    // Zombie and ghost video clips: zombie-walk, -climb, -attack, -hurt and -death (headless
+    // Enemies' video clips: zombie-walk, -climb, -attack, -hurt and -death (headless
     // already); ghost-float, -attack, -hurt and -death (burning up).
     createClipAnims(this, 'zombie', 'zombie', ENEMY_CLIPS.zombie);
     createClipAnims(this, 'ghost', 'ghost', ENEMY_CLIPS.ghost);
-    this.anims.create({ key: 'vampire-idle', frames: frames('vampire', [0, 0, 0, 1]), frameRate: 3, repeat: -1 });
-    this.anims.create({ key: 'vampire-walk', frames: frames('vampire', [2, 3, 4, 5]), frameRate: 7, repeat: -1 });
+    // The vampire: idle, walk, hiss, crouch then tremble (the warning), launch, fly and land
+    // (the lunge), and death (headless already, crumbling to ash).
+    createClipAnims(this, 'vampire', 'vampire', ENEMY_CLIPS.vampire);
     this.anims.create({ key: 'gem-sparkle', frames: frames('gem', [0, 1, 2, 3]), frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'candle-flicker', frames: frames('candle', [0, 1, 0, 2, 1, 2]), frameRate: 8, repeat: -1 });
 

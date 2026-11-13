@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GhostBrain } from '../ai/GhostBrain';
 import { NavGrid } from '../ai/NavGrid';
-import { VAMPIRE_FRAME, VampireBrain } from '../ai/VampireBrain';
+import { VampireBrain } from '../ai/VampireBrain';
 import { ZombieBrain, type ZombieWorld } from '../ai/ZombieBrain';
 import {
   CAMERA,
@@ -352,8 +352,8 @@ export class GameScene extends Phaser.Scene {
             break;
           }
           case 'V': {
-            const v = this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite;
-            (v.body as Body).setSize(8, 21).setOffset(6, 3);
+            const v = (this.vampires.create(cx, bottom - 12, 'vampire', 0) as Sprite).setScale(1 / RENDER_SCALE);
+            (v.body as Body).setSize(8 * RENDER_SCALE, 21 * RENDER_SCALE).setOffset(6 * RENDER_SCALE, 3 * RENDER_SCALE);
             this.setEnemy(v, 'vampire').play('vampire-idle');
             break;
           }
@@ -1484,8 +1484,9 @@ export class GameScene extends Phaser.Scene {
     const flip = enemy.flipX;
     const x = enemy.x;
     enemy.destroy();
-    const body = this.add.image(x, feet, 'vampire', VAMPIRE_FRAME.headless).setOrigin(0.5, 1).setFlipX(flip).setDepth(5);
-    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setFlipX(flip).setDepth(6);
+    // The death clip starts headless: the body twitches, greys and crumbles to an ash pile.
+    const body = this.add.sprite(x, feet, 'vampire').setScale(1 / RENDER_SCALE).setOrigin(0.5, 1).setFlipX(flip).setDepth(5).play('vampire-death');
+    const head = this.add.image(x + (flip ? -1 : 1), feet - 19, 'vampire-head').setScale(1 / RENDER_SCALE).setFlipX(flip).setDepth(6);
     this.cameras.main.shake(140, 0.006);
 
     // The head: up, over and down to the floor, spinning, then a short roll.
@@ -1514,9 +1515,10 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => drop.destroy(),
       });
     }
-    // The body sways, its knees go, and it crumbles to dust.
-    this.tweens.add({ targets: body, angle: -away * 6, duration: 300, yoyo: true, delay: 150 });
-    this.time.delayedCall(700, () => this.crumble(body, feet, 700));
+    // The ash pile lingers, then fades.
+    body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.tweens.add({ targets: body, alpha: 0, delay: 1200, duration: 600, onComplete: () => body.destroy() });
+    });
     this.time.delayedCall(900, () => this.say('The vampire crumbles to dust!\nThe way out is clear.'));
   }
 

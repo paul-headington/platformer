@@ -31,6 +31,17 @@
       {"name": "attack", "file": "attack", "strip": 21, "fps": 14, "anchor": "video", "origin": [10, 40], "once": true},
       {"name": "hurt", "file": "hurt", "strip": 20, "fps": 16, "anchor": "video", "origin": [28, 50], "once": true},
       {"name": "death", "file": "death", "strip": 21, "fps": 14, "anchor": "video", "origin": [134, 0], "once": true}
+    ] },
+    "vampire": { "start": 10, "standHeight": 88, "ground": true, "clips": [
+      {"name": "idle", "file": "idle", "strip": 21, "fps": 12, "anchor": "video", "origin": [226, 76]},
+      {"name": "walk", "file": "walk", "strip": 16, "fps": 12, "anchor": "video", "origin": [194, 76]},
+      {"name": "hiss", "file": "hiss", "strip": 18, "fps": 14, "anchor": "video", "origin": [103, 56], "once": true},
+      {"name": "crouch", "file": "crouch", "strip": 21, "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 16, "anchor": "video", "origin": [164, 210], "once": true},
+      {"name": "tremble", "file": "crouch", "strip": 21, "frames": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "fps": 14, "anchor": "video", "origin": [164, 210]},
+      {"name": "launch", "file": "lunge", "strip": 19, "frames": [2, 3, 4], "fps": 16, "anchor": "video", "origin": [58, 80], "once": true},
+      {"name": "fly", "file": "lunge", "strip": 19, "frames": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "fps": 14, "anchor": "video", "origin": [58, 80]},
+      {"name": "land", "file": "lunge", "strip": 19, "frames": [15, 16, 17, 18], "fps": 14, "anchor": "video", "origin": [58, 80], "once": true},
+      {"name": "death", "file": "death", "strip": 21, "fps": 12, "anchor": "video", "origin": [130, 158], "once": true}
     ] }
   }
 }

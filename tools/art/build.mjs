@@ -134,6 +134,11 @@ if (!onlyArg || 'zombie'.includes(onlyArg)) {
 }
 // Ghost: cells 0-3 were the float.
 if (!onlyArg || 'ghost'.includes(onlyArg)) buildEnemy('ghost', ENEMIES.ghost, [0, 5, 10, 15]);
+if (!onlyArg || 'vampire'.includes(onlyArg)) {
+  // Vampire: cell 0 was where it stands (idle 0-1, walk 2-5); its head is about 0.3x.
+  const scale = buildEnemy('vampire', ENEMIES.vampire, [0, 10, 21, 25, 29, 33]);
+  buildProp('vampire', 'vampire_head', 814 * 0.3 / 2, scale);
+}
 // Painted characters (art/<id>/), and the vector-drawn hunter when his parts are missing.
 const sheets = PAINTED.some((s) => s.name === 'player-hunter') ? PAINTED : [vectorHunter, ...PAINTED];
 for (const sheet of sheets) {
